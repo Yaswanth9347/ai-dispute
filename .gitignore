@@ -1,0 +1,45 @@
+# Node dependencies (ignore all node_modules everywhere)
+**/node_modules/
+
+# pnpm store and lock/log files
+.pnpm-debug.log*
+pnpm-debug.log*
+pnpm-lock.yaml
+
+# npm logs
+npm-debug.log*
+
+# Environment variable files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Build output
+dist/
+build/
+out/
+.next/
+**/.next/
+**/out/
+**/dist/
+**/build/
+
+# IDE/editor folders
+.vscode/
+.idea/
+*.swp
+
+# Chroma DB local data
+data/chroma/
+
+# Misc
+downloaded.bin
+j7.png
+test.py

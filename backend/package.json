@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "process": "node -r dotenv/config -e \"require('./src/lib/mediaWorker').processEvidence(process.argv[1]).then(r=>console.log(JSON.stringify(r,null,2))).catch(e=>console.error(e))\" --"
   },
   "keywords": [],
   "author": "",
@@ -14,8 +15,10 @@
   "dependencies": {
     "@google/genai": "^1.21.0",
     "@supabase/supabase-js": "^2.58.0",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
     "supabase": "^2.47.2",
     "uuid": "^13.0.0"
