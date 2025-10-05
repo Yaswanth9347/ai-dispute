@@ -9,7 +9,6 @@ create table if not exists public.notes (
 );
 
 
-
 -- minimal tables for MVP
 
 create table public.users (

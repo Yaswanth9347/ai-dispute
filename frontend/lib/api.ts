@@ -15,3 +15,17 @@ export function processCaseUrl(caseId: string) {
 export function analyzeUrl() {
   return `${API_BASE}/api/analyze`;
 }
+
+
+// frontend/lib/api.ts  (append these if file exists)
+export function listSettlementsUrl(caseId: string) {
+  return `${API_BASE}/api/cases/${encodeURIComponent(caseId)}/settlements`;
+}
+
+export function signSettlementUrl(caseId: string, settlementId: string) {
+  return `${API_BASE}/api/cases/${encodeURIComponent(caseId)}/settlement/${encodeURIComponent(settlementId)}/sign`;
+}
+
+export function settlementDownloadUrl(caseId: string, settlementId: string) {
+  return `${API_BASE}/api/cases/${encodeURIComponent(caseId)}/settlement/${encodeURIComponent(settlementId)}/download`;
+}

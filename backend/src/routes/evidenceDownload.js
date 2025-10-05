@@ -20,27 +20,15 @@ router.get('/:id/download', async (req, res) => {
 
   if (token) {
     try {
-      // verify token; this will throw if invalid/expired
       const payload = jwt.verify(String(token), SECRET);
-
-      // Accept common claim names: 'eid' or 'evidence_id'
-      const tokenEid = payload && (payload.eid || payload.evidence_id || (payload.eid && payload.eid.toString()));
-
-      if (!tokenEid) {
-        console.error('[evidenceDownload] token verified but missing evidence id claim', { evidenceId, payload });
-        return res.status(401).json({ error: 'token missing evidence id', reason: 'missing_evidence_claim', payload });
+      // accept either claim name 'eid' or 'evidence_id'
+      const tokenEid = payload && (payload.eid || payload.evidence_id || payload.eid?.toString());
+      if (!tokenEid || String(tokenEid) !== String(evidenceId)) {
+        return res.status(403).json({ error: 'invalid token for this evidence' });
       }
-
-      if (String(tokenEid) !== String(evidenceId)) {
-        console.error('[evidenceDownload] token evidence id mismatch', { evidenceId, tokenEid, payload });
-        return res.status(403).json({ error: 'invalid token for this evidence', reason: 'evidence_id_mismatch', tokenEid });
-      }
-
       // token ok -> continue
     } catch (e) {
-      // log error details for debugging (signature/expired/etc.)
-      console.error('[evidenceDownload] token verification failed:', e && e.message ? e.message : e, e);
-      return res.status(401).json({ error: 'token invalid or expired', reason: e && e.message ? e.message : String(e) });
+      return res.status(401).json({ error: 'token invalid or expired', reason: e.message });
     }
   }
 
@@ -53,21 +41,17 @@ router.get('/:id/download', async (req, res) => {
       .single();
 
     if (evErr || !ev) {
-      console.error('[evidenceDownload] evidence not found', evidenceId, evErr);
       return res.status(404).json({ error: 'evidence not found' });
     }
 
     const bucket = process.env.SUPABASE_BUCKET || 'evidence';
     const filePath = ev.file_path;
-    if (!filePath) {
-      console.error('[evidenceDownload] evidence missing file_path', evidenceId, ev);
-      return res.status(404).json({ error: 'no file_path for evidence' });
-    }
+    if (!filePath) return res.status(404).json({ error: 'no file_path for evidence' });
 
     // download from storage
     const { data, error: dlErr } = await supabase.storage.from(bucket).download(filePath);
     if (dlErr || !data) {
-      console.error('[evidenceDownload] storage download error', dlErr);
+      console.error('storage download error', dlErr);
       return res.status(404).json({ error: 'file not found in storage' });
     }
 
@@ -87,13 +71,13 @@ router.get('/:id/download', async (req, res) => {
       // Node stream: pipe directly to response
       return data.pipe(res);
     } else {
-      // fallback: try arrayBuffer again
+      // fallback: try arrayBuffer again (most cases should be handled above)
       const buffer = Buffer.from(await data.arrayBuffer());
       res.setHeader('Content-Length', buffer.length);
       return res.end(buffer);
     }
   } catch (e) {
-    console.error('[evidenceDownload] unexpected error', e);
+    console.error('evidence download failed', e);
     return res.status(500).json({ error: e.message || 'internal error' });
   }
 });
