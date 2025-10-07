@@ -1,56 +1,113 @@
-// backend/src/index.js
+// AI Dispute Resolver Backend - Phase 3 Implementation with Real-Time Features
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
+const http = require('http');
+const { Server } = require('socket.io');
 
-const app = express();
+// Use the existing app configuration
+const app = require('./app');
+const server = http.createServer(app);
 const port = process.env.PORT || 8080;
 
-// Enable CORS for your dev frontend before any other middleware
-app.use(cors({
-  origin: 'http://localhost:3000', // restrict to your frontend during dev
-  credentials: true,
-}));
+// Routes are configured in app.js
 
-// Parse JSON bodies after CORS
-app.use(express.json());
+// Handle uncaught exceptions and unhandled rejections
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  // In production you might want to exit process or notify monitoring
+});
 
-// mount routes
-const casesRouter = require('./routes/cases');
-const analyzeRouter = require('./routes/analyze');
-const processCaseRouter = require('./routes/processCase'); // NEW
-const evidenceRouter = require('./routes/evidence');
-const evidenceStatusRouter = require('./routes/evidenceStatus');
-const caseEvidenceListRouter = require('./routes/caseEvidenceList');
-const evidenceDownloadRouter = require('./routes/evidenceDownload');
-const evidenceSignedRouter = require('./routes/evidenceSigned');
-const authRouter = require('./routes/auth');
-const caseDecisionsRouter = require('./routes/caseDecisions');
-const { requireAuth } = require('./lib/authMiddleware');
-const healthRouter = require('./routes/health');
-const settlementRouter = require('./routes/settlement');
-const settlementSignRouter = require('./routes/settlementSign');
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_ORIGIN || "http://localhost:3001",
+    credentials: true,
+    methods: ["GET", "POST"]
+  },
+  path: '/socket.io/'
+});
 
-// route mounting
-app.use('/api/cases', settlementRouter);
-app.use('/health', healthRouter);
-app.use('/api/cases', casesRouter);
-app.use('/api/cases', processCaseRouter);
-app.use('/api/analyze', analyzeRouter);
-app.use('/api/evidence', evidenceRouter);
-app.use('/api/evidence', evidenceStatusRouter);
-app.use('/api/cases', caseEvidenceListRouter);
-app.use('/api/evidence', evidenceDownloadRouter);
-app.use('/api/evidence', evidenceSignedRouter);
-app.use('/api/auth', authRouter);
-app.use('/debug', require('./routes/debug'));
-app.use('/api/cases', caseDecisionsRouter);
-app.use('/api/cases', settlementSignRouter);
+// Initialize Real-Time Service with Socket.IO
+const realTimeService = require('./services/RealTimeService');
 
+// Pass the io instance to RealTimeService
+realTimeService.initialize(io);
 
-app.get('/', (req, res) => res.send('AI Dispute Resolver backend running'));
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log(`User connected: ${socket.id}`);
+  
+  // Handle authentication
+  socket.on('authenticate', async (data) => {
+    try {
+      await realTimeService.authenticateSocket(socket, data.token);
+    } catch (error) {
+      console.error('Socket authentication failed:', error);
+      socket.emit('auth_error', { message: 'Authentication failed' });
+      socket.disconnect();
+    }
+  });
 
-app.listen(port, () => {
+  // Handle joining case rooms
+  socket.on('join_case', async (data) => {
+    try {
+      await realTimeService.joinCaseRoom(socket, data.caseId);
+    } catch (error) {
+      console.error('Failed to join case room:', error);
+      socket.emit('error', { message: 'Failed to join case room' });
+    }
+  });
+
+  // Handle leaving case rooms
+  socket.on('leave_case', async (data) => {
+    try {
+      await realTimeService.leaveCaseRoom(socket, data.caseId);
+    } catch (error) {
+      console.error('Failed to leave case room:', error);
+    }
+  });
+
+  // Handle sending messages
+  socket.on('send_message', async (data) => {
+    try {
+      await realTimeService.handleMessage(socket, data);
+    } catch (error) {
+      console.error('Failed to handle message:', error);
+      socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  // Handle typing indicators
+  socket.on('typing_start', (data) => {
+    realTimeService.handleTypingStart(socket, data.caseId);
+  });
+
+  socket.on('typing_stop', (data) => {
+    realTimeService.handleTypingStop(socket, data.caseId);
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log(`User disconnected: ${socket.id}`);
+    realTimeService.handleDisconnection(socket);
+  });
+});
+
+// Start server
+server.listen(port, () => {
   console.log(`Backend running on http://localhost:${port}`);
+  console.log(`Socket.IO server initialized for real-time communication`);
+  
+  // Initialize cleanup tasks
+  setInterval(() => {
+    // Clean up expired sessions and notifications every hour
+    const NotificationService = require('./services/NotificationService');
+    const notificationService = new NotificationService();
+    
+    notificationService.cleanupExpiredNotifications().catch(console.error);
+    notificationService.sendDeadlineReminders().catch(console.error);
+  }, 60 * 60 * 1000); // 1 hour
 });

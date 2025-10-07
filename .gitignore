@@ -1,45 +1,58 @@
-# Node dependencies (ignore all node_modules everywhere)
+# Dependencies
+node_modules/
 **/node_modules/
 
-# pnpm store and lock/log files
-.pnpm-debug.log*
-pnpm-debug.log*
-pnpm-lock.yaml
-
-# npm logs
-npm-debug.log*
-
-# Environment variable files (never commit secrets)
+# Environment variables
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
+**/.env
+!**/.env.example
 
-# OS generated files
+# Build outputs
+.next/
+out/
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS files
 .DS_Store
 Thumbs.db
 
-# Log files
-*.log
-
-# Build output
-dist/
-build/
-out/
-.next/
-**/.next/
-**/out/
-**/dist/
-**/build/
-
-# IDE/editor folders
+# IDE
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Chroma DB local data
-data/chroma/
+# Temporary files
+tmp/
+temp/
+/tmp/
 
-# Misc
-downloaded.bin
-j7.png
-test.py
+# Test coverage
+coverage/
+.nyc_output/
+
+# Documentation cleanup
+PHASE*.md
+VISUAL*.md
+APPLICATION*.md
+ANALYTICS*.md
+QUICK*.md
+INTEGRATION*.md
+*_COMPLETE.md
+*_SUMMARY.md
+*_GUIDE.md
+*_REFERENCE.md
+*_CHECKLIST.md
+
+# Keep README
+!README.md
