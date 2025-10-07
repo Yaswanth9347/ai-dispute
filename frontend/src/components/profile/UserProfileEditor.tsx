@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { User, Mail, Phone, Building, Calendar, Camera, Save, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
 
 interface UserProfile {
   id: string;
@@ -26,11 +27,8 @@ export default function UserProfileEditor() {
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/profile`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch('/users/profile');
       if (response.ok) {
         const data = await response.json();
         setProfile(data.data);
@@ -45,19 +43,12 @@ export default function UserProfileEditor() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/profile`, {
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch('/users/profile', {
         method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify(profile),
       });
-
-      if (response.ok) {
-        alert('Profile updated successfully!');
-      }
+      if (response.ok) alert('Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
       alert('Failed to update profile');
@@ -74,16 +65,14 @@ export default function UserProfileEditor() {
     formData.append('avatar', file);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/avatar`, {
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch('/users/avatar', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       if (response.ok) {
         const data = await response.json();
-        setProfile((prev) => prev ? { ...prev, avatar: data.data.avatarUrl } : null);
+        setProfile((prev) => (prev ? { ...prev, avatar: data.data.avatarUrl } : null));
       }
     } catch (error) {
       console.error('Error uploading avatar:', error);

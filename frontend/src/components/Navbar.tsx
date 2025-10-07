@@ -11,7 +11,8 @@ export default function Navbar() {
   const isActive = (path: string) => pathname === path;
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
     window.location.href = '/auth/login';
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/fetchClient';
 import { useNegotiationSocket } from '@/hooks/useNegotiationSocket';
 import { Send, CheckCircle, XCircle, Clock, Users, DollarSign } from 'lucide-react';
 
@@ -28,6 +29,7 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
 
   const { isConnected, lastUpdate, sendProposal, acceptProposal, rejectProposal } = useNegotiationSocket({
     negotiationId,
+    caseId,
     onUpdate: (data) => {
       // Refresh proposals when update received
       fetchProposals();
@@ -41,13 +43,7 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
 
   const fetchNegotiation = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/negotiations/active/${negotiationId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await apiFetch(`/negotiations/active/${negotiationId}`);
       if (response.ok) {
         const data = await response.json();
         setNegotiationData(data.data);
@@ -59,13 +55,7 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
 
   const fetchProposals = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/negotiations/active/${negotiationId}/proposals`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await apiFetch(`/negotiations/active/${negotiationId}/proposals`);
       if (response.ok) {
         const data = await response.json();
         setProposals(data.data || []);
@@ -80,21 +70,11 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/negotiations/active/${negotiationId}/propose`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            amount: parseFloat(amount),
-            message,
-          }),
-        }
-      );
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`/negotiations/active/${negotiationId}/propose`, {
+        method: 'POST',
+        body: JSON.stringify({ amount: parseFloat(amount), message }),
+      });
 
       if (response.ok) {
         sendProposal(parseFloat(amount), message);
@@ -112,21 +92,11 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
   const handleAccept = async (proposalId: string) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/negotiations/active/${negotiationId}/respond`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            proposalId,
-            action: 'accept',
-          }),
-        }
-      );
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`/negotiations/active/${negotiationId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ proposalId, action: 'accept' }),
+      });
 
       if (response.ok) {
         acceptProposal(proposalId);
@@ -142,21 +112,11 @@ export default function NegotiationRoom({ negotiationId, caseId, parties }: Nego
   const handleReject = async (proposalId: string) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/negotiations/active/${negotiationId}/respond`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            proposalId,
-            action: 'reject',
-          }),
-        }
-      );
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`/negotiations/active/${negotiationId}/respond`, {
+        method: 'POST',
+        body: JSON.stringify({ proposalId, action: 'reject' }),
+      });
 
       if (response.ok) {
         rejectProposal(proposalId);

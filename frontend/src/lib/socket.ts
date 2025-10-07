@@ -9,7 +9,19 @@ const SERVER_URL = process.env.NEXT_PUBLIC_API_URL
   : 'http://localhost:8080';
 
 export function getSocket(token?: string) {
-  if (socket) return socket;
+  // If a socket already exists, but a token is provided (or changed), update auth and reconnect
+  if (socket) {
+    try {
+      const currentToken = (socket as any).auth?.token;
+      if (token && currentToken !== token) {
+        (socket as any).auth = { token };
+        try { socket.connect(); } catch (e) { /* ignore */ }
+      }
+    } catch (e) {
+      // ignore
+    }
+    return socket;
+  }
 
   socket = io(SERVER_URL, {
     autoConnect: true,

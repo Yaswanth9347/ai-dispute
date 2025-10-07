@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Shield, Lock, Bell, Eye, Save, AlertTriangle, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
 
 export default function SecuritySettings() {
   const [saving, setSaving] = useState(false);
@@ -20,15 +21,7 @@ export default function SecuritySettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/users/settings/security`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(settings),
-      });
+      await apiFetch('/users/settings/security', { method: 'PUT', body: JSON.stringify(settings) });
       alert('Security settings updated successfully!');
     } catch (error) {
       console.error('Error updating settings:', error);

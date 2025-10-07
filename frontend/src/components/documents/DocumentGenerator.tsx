@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, Download, Eye, Edit, Send } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
 
 interface Template {
   id: string;
@@ -20,7 +21,13 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
-  const [generatedDoc, setGeneratedDoc] = useState<{ url: string; content: string } | null>(null);
+  const [generatedDoc, setGeneratedDoc] = useState<{
+    documentId?: string;
+    filePath?: string;
+    fileFormat?: string;
+    content?: any;
+  } | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
     fetchTemplates();
@@ -28,14 +35,8 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
 
   const fetchTemplates = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/documents/templates`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch('/documents/templates');
       if (response.ok) {
         const data = await response.json();
         setTemplates(data.data || []);
@@ -60,26 +61,39 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/documents/generate`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            caseId,
-            templateId: selectedTemplate.id,
-            variables,
-          }),
-        }
-      );
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch('/documents/generate', {
+        method: 'POST',
+        body: JSON.stringify({ caseId, templateId: selectedTemplate.id, variables }),
+      });
 
       if (response.ok) {
         const data = await response.json();
-        setGeneratedDoc(data.data);
+        const doc = data.data || {};
+        // doc contains: documentId, filePath, content, metadata
+        const documentId = doc.documentId || doc.id || null;
+        const fileFormat = (doc.metadata && doc.metadata.format) || doc.fileFormat || 'pdf';
+        setGeneratedDoc({ documentId, filePath: doc.filePath, fileFormat, content: doc.content });
+
+        // Fetch preview/download blob for PDFs, otherwise preview HTML via preview endpoint
+        if (documentId) {
+          if (fileFormat === 'pdf') {
+            // fetch the binary file for preview
+            const dl = await apiFetch(`/documents/${documentId}/download`);
+            if (dl.ok) {
+              const blob = await dl.blob();
+              const url = URL.createObjectURL(blob);
+              setPreviewUrl(url);
+            }
+          } else {
+            // fetch preview HTML
+            const pr = await apiFetch(`/documents/${documentId}/preview`);
+            if (pr.ok) {
+              const html = await pr.text();
+              setGeneratedDoc((g) => ({ ...(g || {}), content: html }));
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Error generating document:', error);
@@ -185,16 +199,64 @@ export default function DocumentGenerator({ caseId }: DocumentGeneratorProps) {
                 <div className="mb-6">
                   <h4 className="text-sm font-medium text-gray-700 mb-3">Preview:</h4>
                   <div className="p-6 bg-gray-50 border border-gray-200 rounded-lg max-h-96 overflow-y-auto">
-                    <div
-                      className="prose prose-sm max-w-none"
-                      dangerouslySetInnerHTML={{ __html: generatedDoc.content }}
-                    />
+                    {generatedDoc?.fileFormat === 'pdf' ? (
+                      previewUrl ? (
+                        <div className="w-full h-[600px]">
+                          <object data={previewUrl} type="application/pdf" width="100%" height="100%">
+                            <p>PDF preview is not available. <a href={previewUrl} target="_blank" rel="noreferrer">Open in new tab</a></p>
+                          </object>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600">Preparing PDF preview...</p>
+                      )
+                    ) : (
+                      <div
+                        className="prose prose-sm max-w-none"
+                        dangerouslySetInnerHTML={{ __html: generatedDoc?.content || '' }}
+                      />
+                    )}
                   </div>
                 </div>
 
                 {/* Actions */}
                 <div className="flex space-x-3">
-                  <button className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+                  <button
+                    onClick={async () => {
+                      try {
+                        if (previewUrl) {
+                          // use existing blob URL to trigger download
+                          const a = document.createElement('a');
+                          a.href = previewUrl;
+                          const filename = (selectedTemplate?.name || 'document') + `.${generatedDoc?.fileFormat || 'pdf'}`;
+                          a.download = filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          return;
+                        }
+
+                        // fallback: fetch download endpoint
+                        if (generatedDoc?.documentId) {
+                          const res = await apiFetch(`/documents/${generatedDoc.documentId}/download`);
+                          if (!res.ok) throw new Error('Failed to download file');
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          const filename = (selectedTemplate?.name || 'document') + `.${generatedDoc?.fileFormat || 'pdf'}`;
+                          a.download = filename;
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                          // cleanup url after short delay
+                          setTimeout(() => URL.revokeObjectURL(url), 10000);
+                        }
+                      } catch (err) {
+                        console.error('Download failed', err);
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
                     <Download className="w-5 h-5" />
                     <span>Download PDF</span>
                   </button>

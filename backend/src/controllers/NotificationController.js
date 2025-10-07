@@ -2,21 +2,20 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../lib/authMiddleware');
 
-// Mock notifications data (in production, this would come from database)
-let notifications = [];
+const NotificationService = require('../services/NotificationService');
 
 // Get all notifications for user
 router.get('/', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
-    
-    // Filter notifications for this user
-    const userNotifications = notifications.filter(n => n.userId === userId);
-    
-    res.json({
-      success: true,
-      data: userNotifications.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    const userId = req.user.id || req.user.sub;
+    const { limit = 50, offset = 0 } = req.query;
+
+    const notifications = await NotificationService.getUserNotifications(userId, {
+      limit: parseInt(limit, 10) || 50,
+      offset: parseInt(offset, 10) || 0
     });
+
+    res.json({ success: true, data: notifications });
   } catch (error) {
     console.error('Error fetching notifications:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -27,15 +26,10 @@ router.get('/', requireAuth, async (req, res) => {
 router.put('/:id/read', requireAuth, async (req, res) => {
   try {
     const notificationId = req.params.id;
-    const notification = notifications.find(n => n.id === notificationId);
-    
-    if (!notification) {
-      return res.status(404).json({ success: false, error: 'Notification not found' });
-    }
-    
-    notification.read = true;
-    
-    res.json({ success: true, data: notification });
+    const userId = req.user.id || req.user.sub;
+
+    const updated = await NotificationService.markAsRead(notificationId, userId);
+    res.json({ success: true, data: updated });
   } catch (error) {
     console.error('Error marking notification as read:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -45,15 +39,11 @@ router.put('/:id/read', requireAuth, async (req, res) => {
 // Mark all notifications as read
 router.put('/read-all', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
-    
-    notifications.forEach(n => {
-      if (n.userId === userId) {
-        n.read = true;
-      }
-    });
-    
-    res.json({ success: true, message: 'All notifications marked as read' });
+    const userId = req.user.id || req.user.sub;
+    const { caseId = null } = req.body || {};
+
+    const updated = await NotificationService.markAllAsRead(userId, caseId);
+    res.json({ success: true, data: updated });
   } catch (error) {
     console.error('Error marking all as read:', error);
     res.status(500).json({ success: false, error: error.message });
@@ -64,40 +54,25 @@ router.put('/read-all', requireAuth, async (req, res) => {
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
     const notificationId = req.params.id;
-    const index = notifications.findIndex(n => n.id === notificationId);
-    
-    if (index === -1) {
-      return res.status(404).json({ success: false, error: 'Notification not found' });
+    const userId = req.user.id || req.user.sub;
+
+    const { data, error } = await require('../lib/supabaseClient').supabaseAdmin
+      .from('notifications')
+      .delete()
+      .eq('notification_id', notificationId)
+      .eq('user_id', userId)
+      .select();
+
+    if (error) {
+      throw new Error(error.message);
     }
-    
-    notifications.splice(index, 1);
-    
-    res.json({ success: true, message: 'Notification deleted' });
+
+    res.json({ success: true, data });
   } catch (error) {
     console.error('Error deleting notification:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Helper function to send notification (called by other services)
-function sendNotification(userId, notification) {
-  const newNotification = {
-    id: Date.now().toString() + Math.random(),
-    userId,
-    ...notification,
-    timestamp: new Date().toISOString(),
-    read: false
-  };
-  
-  notifications.push(newNotification);
-  
-  // Emit via Socket.IO if available
-  const realTimeService = require('../services/RealTimeService');
-  realTimeService.sendNotification(userId, newNotification);
-  
-  return newNotification;
-}
-
-// Export router and helper function separately
-router.sendNotification = sendNotification;
+// Expose router
 module.exports = router;

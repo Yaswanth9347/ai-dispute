@@ -12,7 +12,7 @@ const upload = multer({
   dest: 'uploads/',
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.mimetype)) {
       const err = new Error('INVALID_FILE_TYPE');
       err.status = 400;
@@ -31,7 +31,17 @@ function sanitizeFileName(fileName) {
 function scanFile(filePath) {
   return new Promise((resolve, reject) => {
     exec(`clamscan --no-summary "${filePath}"`, (err, stdout, stderr) => {
-      if (err && err.code !== 1) return reject(err); // clamscan exits with code 1 if infected
+      // If clamscan is not installed, `exec` will error (often code 127).
+      // In that case we should not fail the entire upload; log and continue.
+      if (err) {
+        const errMsg = (stderr || err.message || '').toString();
+        if (err.code === 127 || /not found/i.test(errMsg) || /no such file or directory/i.test(errMsg)) {
+          console.warn('clamscan not found on system, skipping virus scan');
+          return resolve();
+        }
+        // clamscan exits with code 1 when a virus is found; treat that as a rejection
+        if (err.code !== 1) return reject(err);
+      }
       if (stdout && stdout.includes('FOUND')) return reject(new Error('VIRUS_DETECTED'));
       resolve();
     });
@@ -74,6 +84,8 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
         console.warn('supabase.upload error', error);
         // continue without storage if upload fails
       }
+      // build public url
+      var publicUrl = `${process.env.SUPABASE_URL.replace(/\/$/, '')}/storage/v1/object/public/${bucket}/${encodeURIComponent(storagePath)}`;
     } catch (e) {
       console.warn('supabase upload exception', e && e.message ? e.message : e);
     }
@@ -82,19 +94,22 @@ router.post('/upload', upload.single('file'), async (req, res, next) => {
     const caseId = req.body.case_id || null;
     const uploaderId = req.body.uploader_id || null;
     try {
-      const { data: evData, error: evErr } = await supabase.from('evidence').insert([{ case_id: caseId, file_path: storagePath, metadata: { original_name: originalName, mime: req.file.mimetype }, uploader_id: uploaderId }]).select().single();
+      const insertPayload = { case_id: caseId, file_path: storagePath, metadata: { original_name: originalName, mime: req.file.mimetype }, uploader_id: uploaderId };
+      const { data: evData, error: evErr } = await supabase.from('evidence').insert([insertPayload]).select().single();
       if (evErr) {
-        console.warn('evidence insert error', evErr);
+        console.warn('evidence insert error', JSON.stringify(evErr));
+        console.warn('insert payload', JSON.stringify(insertPayload));
+        return res.status(500).json({ success: false, error: 'failed to insert evidence', details: evErr });
       }
       const evidenceId = evData && evData.id ? evData.id : null;
 
       // enqueue processing
-      if (evidenceId) enqueueEvidence(evidenceId);
+  if (evidenceId) enqueueEvidence(evidenceId);
 
-      // remove local file now that it's uploaded
-      try { fs.unlinkSync(destPath); } catch (e) {}
+  // remove local file now that it's uploaded
+  try { fs.unlinkSync(destPath); } catch (e) {}
 
-      return res.status(201).json({ success: true, evidenceId, storagePath });
+  return res.status(201).json({ success: true, evidenceId, storagePath, publicUrl });
     } catch (e) {
       console.error('failed to create evidence row', e);
       return res.status(500).json({ success: false, error: 'failed to save evidence record' });

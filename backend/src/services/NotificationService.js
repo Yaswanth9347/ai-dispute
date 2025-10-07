@@ -217,37 +217,44 @@ class NotificationService {
    */
   async sendRealtimeNotification(notification) {
     try {
-      // Import RealTimeService to avoid circular dependency
-      const RealTimeService = require('./RealTimeService');
-      const realTimeService = new RealTimeService();
+      // Use the RealTimeService singleton (avoid instantiating)
+      const realTimeService = require('./RealTimeService');
 
-      // Send to user's personal room
-      await realTimeService.sendToUser(notification.user_id, 'notification', {
-        notificationId: notification.notification_id,
-        type: notification.notification_type,
-        title: notification.title,
-        message: notification.message,
-        priority: notification.priority,
-        actionUrl: notification.action_url,
-        actionData: notification.action_data,
-        createdAt: notification.created_at,
-        caseId: notification.case_id
-      });
-
-      // Also send to case room if case-related
-      if (notification.case_id) {
-        await realTimeService.sendToCaseRoom(notification.case_id, 'case_notification', {
+      // Emit to the user's socket (if connected)
+      try {
+        realTimeService.emitToUser(notification.user_id, 'notification', {
           notificationId: notification.notification_id,
-          userId: notification.user_id,
           type: notification.notification_type,
           title: notification.title,
           message: notification.message,
           priority: notification.priority,
-          createdAt: notification.created_at
+          actionUrl: notification.action_url,
+          actionData: notification.action_data,
+          createdAt: notification.created_at,
+          caseId: notification.case_id
         });
+      } catch (e) {
+        logger.warn('Failed to emit notification to user via RealTimeService', { err: e.message });
       }
 
-      // Update notification as real-time sent
+      // Also broadcast to the case room when applicable
+      if (notification.case_id) {
+        try {
+          realTimeService.broadcastToCaseRoom(notification.case_id, 'case_notification', {
+            notificationId: notification.notification_id,
+            userId: notification.user_id,
+            type: notification.notification_type,
+            title: notification.title,
+            message: notification.message,
+            priority: notification.priority,
+            createdAt: notification.created_at
+          });
+        } catch (e) {
+          logger.warn('Failed to broadcast notification to case room', { err: e.message });
+        }
+      }
+
+      // Update notification as real-time sent (best-effort)
       await supabaseAdmin
         .from('notifications')
         .update({ 
@@ -256,7 +263,7 @@ class NotificationService {
         })
         .eq('notification_id', notification.notification_id);
 
-      logger.info('Real-time notification sent successfully', { 
+      logger.info('Real-time notification processed (attempted emit)', { 
         notificationId: notification.notification_id 
       });
 
@@ -523,6 +530,141 @@ class NotificationService {
     } catch (error) {
       logger.error('Error sending invitation notification:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Notify parties that statements are needed
+   */
+  async notifyStatementsNeeded(caseId) {
+    try {
+      const CaseParty = require('../models/CaseParty');
+      const parties = await CaseParty.findAll({ case_id: caseId });
+      
+      for (const party of parties) {
+        if (party.user_id) {
+          await this.createNotification({
+            userId: party.user_id,
+            caseId,
+            type: this.notificationTypes.CASE_UPDATE,
+            title: 'Submit Your Statement',
+            message: 'Please submit your statement for the dispute case',
+            priority: this.priorities.HIGH,
+            actionUrl: `/cases/${caseId}/statements`,
+            sendEmail: true
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying statements needed:', error);
+    }
+  }
+
+  /**
+   * Notify parties that settlement options are ready
+   */
+  async notifyOptionsReady(caseId) {
+    try {
+      const CaseParty = require('../models/CaseParty');
+      const parties = await CaseParty.findAll({ case_id: caseId });
+      
+      for (const party of parties) {
+        if (party.user_id) {
+          await this.createNotification({
+            userId: party.user_id,
+            caseId,
+            type: this.notificationTypes.CASE_UPDATE,
+            title: 'AI Settlement Options Ready',
+            message: 'AI has generated 3 settlement options for your review',
+            priority: this.priorities.HIGH,
+            actionUrl: `/cases/${caseId}/settlement-options`,
+            sendEmail: true
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying options ready:', error);
+    }
+  }
+
+  /**
+   * Notify parties that consensus has been reached
+   */
+  async notifyConsensusReached(caseId) {
+    try {
+      const CaseParty = require('../models/CaseParty');
+      const parties = await CaseParty.findAll({ case_id: caseId });
+      
+      for (const party of parties) {
+        if (party.user_id) {
+          await this.createNotification({
+            userId: party.user_id,
+            caseId,
+            type: this.notificationTypes.SETTLEMENT_REACHED,
+            title: '🎉 Settlement Consensus Reached',
+            message: 'Both parties have agreed on a settlement option',
+            priority: this.priorities.URGENT,
+            actionUrl: `/cases/${caseId}/settlement`,
+            sendEmail: true
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying consensus reached:', error);
+    }
+  }
+
+  /**
+   * Notify parties that case is being forwarded to court
+   */
+  async notifyCaseForwarded(caseId) {
+    try {
+      const CaseParty = require('../models/CaseParty');
+      const parties = await CaseParty.findAll({ case_id: caseId });
+      
+      for (const party of parties) {
+        if (party.user_id) {
+          await this.createNotification({
+            userId: party.user_id,
+            caseId,
+            type: this.notificationTypes.CASE_UPDATE,
+            title: 'Case Forwarded to Court',
+            message: 'Your dispute case has been escalated to the regional court',
+            priority: this.priorities.HIGH,
+            actionUrl: `/cases/${caseId}`,
+            sendEmail: true
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying case forwarded:', error);
+    }
+  }
+
+  /**
+   * Notify parties that settlement is closed
+   */
+  async notifySettlementClosed(caseId) {
+    try {
+      const CaseParty = require('../models/CaseParty');
+      const parties = await CaseParty.findAll({ case_id: caseId });
+      
+      for (const party of parties) {
+        if (party.user_id) {
+          await this.createNotification({
+            userId: party.user_id,
+            caseId,
+            type: this.notificationTypes.SETTLEMENT_REACHED,
+            title: '✅ Dispute Settled Successfully',
+            message: 'Your dispute has been successfully resolved and closed',
+            priority: this.priorities.HIGH,
+            actionUrl: `/cases/${caseId}/final-document`,
+            sendEmail: true
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Error notifying settlement closed:', error);
     }
   }
 

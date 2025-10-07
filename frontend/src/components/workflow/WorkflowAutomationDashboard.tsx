@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Zap, Plus, Play, Pause, Trash2, Edit, Calendar, CheckCircle } from 'lucide-react';
+import apiFetch from '../../lib/fetchClient';
 
 interface Workflow {
   id: string;
@@ -23,70 +24,101 @@ interface Workflow {
 }
 
 export default function WorkflowAutomationDashboard() {
-  const [workflows, setWorkflows] = useState<Workflow[]>([
-    {
-      id: '1',
-      name: 'Auto-analyze New Evidence',
-      description: 'Automatically run AI analysis when new evidence is uploaded',
-      trigger: {
-        type: 'evidence_uploaded',
-      },
-      actions: [
-        {
-          id: 'a1',
-          type: 'ai_analysis',
-          config: { analysisType: 'relevance' },
-        },
-        {
-          id: 'a2',
-          type: 'send_notification',
-          config: { message: 'AI analysis complete' },
-        },
-      ],
-      status: 'active',
-      executionCount: 45,
-      lastRun: '2025-10-07T10:30:00Z',
-      createdAt: '2025-09-01T00:00:00Z',
-    },
-    {
-      id: '2',
-      name: 'Settlement Agreement Generator',
-      description: 'Generate settlement documents when both parties accept',
-      trigger: {
-        type: 'settlement_reached',
-      },
-      actions: [
-        {
-          id: 'a3',
-          type: 'generate_document',
-          config: { template: 'settlement_agreement' },
-        },
-        {
-          id: 'a4',
-          type: 'send_email',
-          config: { recipients: 'all_parties' },
-        },
-      ],
-      status: 'active',
-      executionCount: 12,
-      lastRun: '2025-10-06T14:20:00Z',
-      createdAt: '2025-09-15T00:00:00Z',
-    },
-  ]);
+  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const [showBuilder, setShowBuilder] = useState(false);
 
   const toggleWorkflow = (id: string) => {
-    setWorkflows((prev) =>
-      prev.map((w) =>
-        w.id === id ? { ...w, status: w.status === 'active' ? 'paused' : 'active' } : w
-      )
-    );
+    // Call demo API to toggle status
+    (async () => {
+      try {
+        const resp = await apiFetch(`/workflows/${id}/toggle`, { method: 'PUT' });
+        const json = await resp.json();
+        if (json?.success && json.data) {
+          setWorkflows((prev) => prev.map((w) => (w.id === id ? json.data : w)));
+        }
+      } catch (err: any) {
+        console.error('Failed to toggle workflow', err);
+        setError('Failed to toggle workflow');
+      }
+    })();
   };
 
   const deleteWorkflow = (id: string) => {
-    setWorkflows((prev) => prev.filter((w) => w.id !== id));
+    (async () => {
+      try {
+        const resp = await apiFetch(`/workflows/${id}`, { method: 'DELETE' });
+        const json = await resp.json();
+        if (resp.ok && json?.success) {
+          setWorkflows((prev) => prev.filter((w) => w.id !== id));
+        } else {
+          throw new Error(json?.error || 'Delete failed');
+        }
+      } catch (err: any) {
+        console.error('Failed to delete workflow', err);
+        setError('Failed to delete workflow');
+      }
+    })();
   };
+
+  const executeWorkflow = (id: string) => {
+    (async () => {
+      try {
+        const resp = await apiFetch(`/workflows/${id}/execute`, { method: 'POST' });
+        const json = await resp.json();
+        if (resp.ok && json?.success && json.data) {
+          // Update executionCount and lastRun if returned
+          setWorkflows((prev) =>
+            prev.map((w) =>
+              w.id === id
+                ? {
+                    ...w,
+                    executionCount: (w.executionCount || 0) + (json.data.actionsExecuted || 1),
+                    lastRun: new Date().toISOString(),
+                  }
+                : w
+            )
+          );
+        }
+      } catch (err: any) {
+        console.error('Failed to execute workflow', err);
+        setError('Failed to execute workflow');
+      }
+    })();
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    (async () => {
+      try {
+        const resp = await apiFetch('/workflows');
+        if (!mounted) return;
+        if (!resp.ok) {
+          const txt = await resp.text();
+          throw new Error(txt || 'Failed to fetch workflows');
+        }
+        const json = await resp.json();
+        if (json?.success && Array.isArray(json.data)) {
+          setWorkflows(json.data);
+        } else if (json?.data) {
+          // older shape
+          setWorkflows(json.data);
+        }
+      } catch (err: any) {
+        console.error('Error loading workflows', err);
+        setError('Unable to load workflows');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const getTriggerIcon = (type: string) => {
     switch (type) {
@@ -262,6 +294,13 @@ export default function WorkflowAutomationDashboard() {
                   ) : (
                     <Play className="w-5 h-5" />
                   )}
+                </button>
+                <button
+                  onClick={() => executeWorkflow(workflow.id)}
+                  className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100"
+                  title="Execute"
+                >
+                  <Play className="w-5 h-5" />
                 </button>
                 <button className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100">
                   <Edit className="w-5 h-5" />

@@ -63,9 +63,9 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
       }
       const user = signData.user;
       const now = Math.floor(Date.now() / 1000);
-  const payload = { sub: user.id, email: user.email || null, name: user.user_metadata?.name || null, iat: now };
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-  return res.json({ token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id: user.id, email: user.email, name: user.user_metadata?.name || null } });
+      const payload = { sub: user.id, email: user.email || null, name: user.user_metadata?.name || null, iat: now };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+      return res.json({ success: true, data: { token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id: user.id, email: user.email, name: user.user_metadata?.name || null } } });
     } catch (e) {
       if (e instanceof HttpError) throw e;
       console.error('signInWithPassword err', e);
@@ -83,7 +83,7 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
       const now = Math.floor(Date.now() / 1000);
       const payload = { sub: id, email: email || null, name: null, iat: now };
       const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-      return res.json({ token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id, email, name: null } });
+      return res.json({ success: true, data: { token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id, email, name: null } } });
     } catch (e) {
       // swallow and continue to fallback logic
       console.warn('test dev login fallback failed', e.message || e);
@@ -108,7 +108,7 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
   const now = Math.floor(Date.now() / 1000);
   const payload = { sub: user.id, email: user.email || null, name: user.name || null, iat: now };
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-  return res.json({ token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id: user.id, email: user.email, name: user.name } });
+  return res.json({ success: true, data: { token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id: user.id, email: user.email, name: user.name } } });
 }));
 
 // Register endpoint: POST /api/auth/register
@@ -145,13 +145,13 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
 
       // Optionally auto-login in development to bypass email confirmation
       if (process.env.SUPABASE_AUTO_LOGIN === 'true') {
-  const now = Math.floor(Date.now() / 1000);
-  const payload = { sub: createdUser.id, email: createdUser.email || null, name: name || null, iat: now };
-  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-  return res.status(201).json({ success: true, user: { id: createdUser.id, email: createdUser.email, name: name || null }, token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString() });
+        const now = Math.floor(Date.now() / 1000);
+        const payload = { sub: createdUser.id, email: createdUser.email || null, name: name || null, iat: now };
+        const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+        return res.status(201).json({ success: true, data: { user: { id: createdUser.id, email: createdUser.email, name: name || null }, token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString() } });
       }
 
-      return res.status(201).json({ success: true, user: { id: createdUser.id, email: createdUser.email, name: name || null } });
+      return res.status(201).json({ success: true, data: { user: { id: createdUser.id, email: createdUser.email, name: name || null } } });
     } catch (e) {
       console.error('register(createUser) err', e);
       if (e instanceof HttpError) throw e;
@@ -172,7 +172,7 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
       console.error('supabase insert error fallback', error);
       return res.status(500).json({ success: false, message: 'Failed to register user', detail: error });
     }
-    return res.status(201).json({ success: true, user: { id: data.id, email: data.email, name: data.name } });
+    return res.status(201).json({ success: true, data: { user: { id: data.id, email: data.email, name: data.name } } });
   } catch (fallbackErr) {
     console.error('register fallback err', fallbackErr);
     // schema doesn't support password or supabase auth not configured
@@ -203,7 +203,7 @@ router.post('/refresh', (req, res) => {
       };
 
       const newToken = jwt.sign(newPayload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-      res.json({ token: newToken, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString() });
+      res.json({ success: true, data: { token: newToken, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString() } });
     });
   } catch (e) {
     console.error('auth/refresh err', e);
@@ -222,13 +222,34 @@ router.get('/me', (req, res) => {
     jwt.verify(token, JWT_SECRET, (err, decoded) => {
       if (err) return res.status(401).json({ error: 'invalid_token', message: err.message });
       const user = { id: decoded.sub, email: decoded.email || null, name: decoded.name || null };
-      return res.json({ user });
+      return res.json({ success: true, data: user });
     });
   } catch (e) {
     console.error('auth/me err', e);
     return res.status(500).json({ error: 'internal_error', message: e.message });
   }
 });
+
+// Dev-only: create or return a seeded test user and token
+router.post('/dev-seed', asyncHandler(async (req, res) => {
+  if (process.env.NODE_ENV === 'production') return res.status(403).json({ success: false, message: 'not_allowed' });
+  const { email = 'dev@example.com', name = 'Dev User' } = req.body || {};
+  try {
+    const { data, error } = await supabase.from('users').insert([{ email, name }], { upsert: true }).select('id, email, name').maybeSingle();
+    if (error) {
+      console.warn('dev-seed insert error', error);
+      return res.status(500).json({ success: false, message: 'failed_seed', detail: error });
+    }
+    const id = data?.id || `dev-${Date.now()}`;
+    const now = Math.floor(Date.now() / 1000);
+    const payload = { sub: id, email: data?.email || email, name: data?.name || name, iat: now };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+    return res.json({ success: true, data: { token, user: { id, email: data?.email || email, name: data?.name || name } } });
+  } catch (e) {
+    console.error('dev-seed err', e);
+    return res.status(500).json({ success: false, message: 'seed_failed', detail: e.message });
+  }
+}));
 
 // Helpful browser responses for GET requests (register/login) to avoid "Cannot GET" in browser
 router.get('/register', (req, res) => {

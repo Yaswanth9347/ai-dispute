@@ -2,6 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../lib/authMiddleware');
 
+// Simple in-memory conversation store for dev/testing.
+// Maps userId -> Array<{ role: 'user'|'assistant', content: string, timestamp: string }>
+const conversationStore = new Map();
+
 // AI Chat endpoint
 router.post('/chat', requireAuth, async (req, res) => {
   try {
@@ -26,6 +30,25 @@ router.post('/chat', requireAuth, async (req, res) => {
       "default": `I understand your question about "${message}". Based on the ${caseId ? 'case details' : 'information provided'}, here's my analysis:\n\nYour situation involves important legal considerations that require careful examination. ${conversationHistory && conversationHistory.length > 2 ? 'Building on our previous discussion, ' : ''}I recommend:\n\n1. **Document Everything**: Keep detailed records of all interactions\n2. **Consider Mediation**: Often faster and less costly than litigation\n3. **Know Your Rights**: Familiarize yourself with relevant laws\n4. **Seek Resolution**: Focus on practical solutions\n\nWould you like me to elaborate on any specific aspect?`
     };
     
+    // Persist conversation in memory (dev only)
+    try {
+      const userId = req.user?.sub || req.user?.id || 'anon';
+      const history = conversationStore.get(userId) || [];
+      history.push({ role: 'user', content: message, timestamp: new Date().toISOString() });
+      // merge any provided conversationHistory
+      if (Array.isArray(conversationHistory) && conversationHistory.length) {
+        for (const h of conversationHistory) {
+          if (!h.role || !h.content) continue;
+          history.push({ role: h.role, content: h.content, timestamp: new Date().toISOString() });
+        }
+      }
+      // keep last 40 messages
+      conversationStore.set(userId, history.slice(-40));
+    } catch (e) {
+      // don't fail if store update fails
+      console.warn('Conversation store update failed', e.message || e);
+    }
+
     // Simple keyword matching for demo
     const lowerMessage = message.toLowerCase();
     let response;
@@ -42,6 +65,16 @@ router.post('/chat', requireAuth, async (req, res) => {
       response = responses.default;
     }
     
+    // Save assistant response to conversation store
+    try {
+      const userId = req.user?.sub || req.user?.id || 'anon';
+      const history = conversationStore.get(userId) || [];
+      history.push({ role: 'assistant', content: response, timestamp: new Date().toISOString() });
+      conversationStore.set(userId, history.slice(-40));
+    } catch (e) {
+      // ignore
+    }
+
     res.json({
       success: true,
       data: {

@@ -63,21 +63,19 @@ export default function RegisterPage() {
         throw new Error(data.message || data.detail?.message || 'Registration failed');
       }
 
-      // If token is returned (auto-login enabled), store it
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-        if (data.user) {
-          localStorage.setItem('user_data', JSON.stringify(data.user));
-        }
-        // Redirect to dashboard
+      const payload = data && data.token ? data : (data && data.data ? data.data : null);
+      if (payload && payload.token) {
+        localStorage.setItem('auth_token', payload.token);
+        if (payload.user) localStorage.setItem('user_data', JSON.stringify(payload.user));
         router.push('/dashboard');
-      } else {
-        // Show success message
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/auth/login');
-        }, 2000);
+        return;
       }
+
+      // Show success message
+      setSuccess(true);
+      setTimeout(() => {
+        router.push('/auth/login');
+      }, 2000);
     } catch (err: any) {
       console.error('Registration failed:', err);
       setError(err.message || 'Registration failed. Please try again.');

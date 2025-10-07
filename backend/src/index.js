@@ -36,65 +36,9 @@ const realTimeService = require('./services/RealTimeService');
 // Pass the io instance to RealTimeService
 realTimeService.initialize(io);
 
-// Socket.IO connection handling
-io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.id}`);
-  
-  // Handle authentication
-  socket.on('authenticate', async (data) => {
-    try {
-      await realTimeService.authenticateSocket(socket, data.token);
-    } catch (error) {
-      console.error('Socket authentication failed:', error);
-      socket.emit('auth_error', { message: 'Authentication failed' });
-      socket.disconnect();
-    }
-  });
-
-  // Handle joining case rooms
-  socket.on('join_case', async (data) => {
-    try {
-      await realTimeService.joinCaseRoom(socket, data.caseId);
-    } catch (error) {
-      console.error('Failed to join case room:', error);
-      socket.emit('error', { message: 'Failed to join case room' });
-    }
-  });
-
-  // Handle leaving case rooms
-  socket.on('leave_case', async (data) => {
-    try {
-      await realTimeService.leaveCaseRoom(socket, data.caseId);
-    } catch (error) {
-      console.error('Failed to leave case room:', error);
-    }
-  });
-
-  // Handle sending messages
-  socket.on('send_message', async (data) => {
-    try {
-      await realTimeService.handleMessage(socket, data);
-    } catch (error) {
-      console.error('Failed to handle message:', error);
-      socket.emit('error', { message: 'Failed to send message' });
-    }
-  });
-
-  // Handle typing indicators
-  socket.on('typing_start', (data) => {
-    realTimeService.handleTypingStart(socket, data.caseId);
-  });
-
-  socket.on('typing_stop', (data) => {
-    realTimeService.handleTypingStop(socket, data.caseId);
-  });
-
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    realTimeService.handleDisconnection(socket);
-  });
-});
+// Socket.IO connection handling is managed by RealTimeService.initialize
+// RealTimeService sets up its own io.on('connection') and event handlers
+// to avoid duplicated listeners and naming mismatches.
 
 // Start server
 server.listen(port, () => {

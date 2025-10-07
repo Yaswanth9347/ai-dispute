@@ -52,3 +52,45 @@ async function sendMail(opts) {
 }
 
 module.exports = { sendMail, getTransporter };
+
+// Backwards-compatible sendEmail wrapper used by services
+async function sendEmail(options) {
+  // options may be: { to, subject, html, text } or { to, subject, template, data }
+  if (!options || !options.to || !options.subject) {
+    throw new Error('sendEmail requires at least to and subject');
+  }
+
+  let mailOpts = {
+    to: options.to,
+    subject: options.subject,
+  };
+
+  if (options.html) {
+    mailOpts.html = options.html;
+  } else if (options.text) {
+    mailOpts.text = options.text;
+  } else if (options.template && options.data) {
+    // Very small templating fallback: interpolate {{key}} from data into template string name if provided
+    // In production a proper templating engine would be used. Here we build a minimal HTML body.
+    const d = options.data || {};
+    const title = options.subject || d.subject || '';
+    let body = `<div style="font-family: Arial, sans-serif; max-width:600px;margin:0 auto;">`;
+    body += `<h2 style="color:#2563eb">${title}</h2>`;
+    body += `<p>${d.invitation_message || d.message || ''}</p>`;
+    if (d.invitation_url) {
+      body += `<p><a href="${d.invitation_url}" style="background:#2563eb;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none">Open Invitation</a></p>`;
+    }
+    body += `<p style="color:#6b7280;font-size:13px">This is an automated message from the AI Dispute Resolver system.</p>`;
+    body += `</div>`;
+    mailOpts.html = body;
+  } else {
+    // Fallback text
+    mailOpts.text = options.text || (options.template ? `You have a notification: ${options.subject}` : '');
+  }
+
+  const result = await sendMail(mailOpts);
+  return result;
+}
+
+// also export sendEmail for existing code
+module.exports.sendEmail = sendEmail;

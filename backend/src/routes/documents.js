@@ -7,6 +7,9 @@ const { body, param, query } = require('express-validator');
 
 const router = express.Router();
 
+const multer = require('multer');
+const upload = multer({ dest: '/tmp/uploads' });
+
 // Apply authentication middleware to all routes
 router.use(requireAuth);
 
@@ -161,6 +164,55 @@ const documentIdValidation = [
  *         description: Internal server error
  */
 router.post('/generate', generateDocumentValidation, validate, DocumentController.generateDocument);
+
+/**
+ * POST /api/documents/upload
+ * Accept a file upload and create a generated_documents record that can be used for court filings
+ */
+router.post('/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, error: 'No file uploaded' });
+
+    const fs = require('fs');
+    const path = require('path');
+    const { supabase } = require('../lib/supabaseClient');
+
+    const storageDir = process.env.DOCUMENT_STORAGE_PATH || path.join(process.cwd(), 'storage', 'documents');
+    await fs.promises.mkdir(storageDir, { recursive: true });
+
+    const originalName = req.file.originalname || 'uploaded_document';
+    const sanitized = originalName.replace(/[^a-zA-Z0-9._-]/g, '_');
+    const destPath = path.join(storageDir, `${Date.now()}_${sanitized}`);
+
+    // move file from tmp to storage
+    await fs.promises.rename(req.file.path, destPath);
+
+    const fileFormat = (req.file.mimetype || '').split('/').pop() || 'bin';
+    const fileSize = req.file.size || 0;
+
+    const payload = {
+      case_id: req.body.caseId || null,
+      title: path.parse(sanitized).name,
+      file_path: destPath,
+      file_format: fileFormat,
+      file_size: fileSize,
+      generated_by: req.user?.id || null,
+      generated_at: new Date().toISOString(),
+      metadata: { uploaded: true }
+    };
+
+    const { data, error } = await supabase.from('generated_documents').insert([payload]).select().single();
+    if (error) {
+      console.error('generated_documents insert error', error);
+      return res.status(500).json({ success: false, error: 'Failed to save generated document' });
+    }
+
+    res.status(201).json({ success: true, documentId: data.id, data });
+  } catch (err) {
+    console.error('documents upload error', err);
+    return res.status(500).json({ success: false, error: err.message || 'internal error' });
+  }
+});
 
 /**
  * @swagger

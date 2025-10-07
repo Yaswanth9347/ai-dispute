@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Send, Sparkles, MessageSquare, Loader2 } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
 
 interface Message {
   id: string;
@@ -41,20 +42,15 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/ai/chat`, {
+      // Build conversation history including the new user message (avoid stale messages state)
+      const conversationHistory = [...messages, userMessage].map((m) => ({ role: m.role, content: m.content }));
+
+      const response = await apiFetch('/ai/chat', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          message: input,
+          message: userMessage.content,
           caseId,
-          conversationHistory: messages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
+          conversationHistory,
         }),
       });
 

@@ -35,7 +35,8 @@ export const authService = {
 
   // Get current user profile
   getProfile: async (): Promise<ApiResponse<User>> => {
-    return apiRequest.get<User>('/auth/profile');
+    // The backend exposes current user at /api/auth/me (returns { success, data: user })
+    return apiRequest.get<User>('/auth/me');
   },
 
   // Update user profile

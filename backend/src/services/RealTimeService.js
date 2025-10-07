@@ -14,27 +14,36 @@ class RealTimeService {
 
   // Initialize Socket.IO server
   initialize(server) {
-    this.io = new Server(server, {
-      cors: {
-        origin: process.env.FRONTEND_URL || "http://localhost:3001",
-        credentials: true
-      },
-      transports: ['websocket', 'polling']
-    });
+    // If a Server instance is passed (from index.js), use it. Otherwise, expect an http.Server
+    if (server && typeof server.on === 'function' && server.of) {
+      // server looks like a Socket.IO Server
+      this.io = server;
+    } else {
+      // fall back: create a new Server bound to the http server
+      this.io = new Server(server, {
+        cors: {
+          origin: process.env.FRONTEND_URL || "http://localhost:3001",
+          credentials: true
+        },
+        transports: ['websocket', 'polling']
+      });
+    }
 
-    // Authentication middleware
+    // Attach authentication middleware
     this.io.use(async (socket, next) => {
       try {
-        const token = socket.handshake.auth.token;
+        // Support token via handshake.auth.token or handshake.query.token for backwards compatibility
+        const token = socket.handshake?.auth?.token || socket.handshake?.query?.token;
         if (!token) {
           return next(new Error('Authentication token required'));
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.userId = decoded.id;
-        socket.userEmail = decoded.email;
-        
-        logger.info(`User ${decoded.email} connecting via WebSocket`);
+        // normalize decoded IDs - support common claim names
+        socket.userId = decoded.id || decoded.sub || decoded.userId;
+        socket.userEmail = decoded.email || decoded.user_email || decoded.username;
+
+        logger.info(`User ${socket.userEmail || 'unknown'} connecting via WebSocket`);
         next();
       } catch (error) {
         logger.error('WebSocket authentication failed:', error);

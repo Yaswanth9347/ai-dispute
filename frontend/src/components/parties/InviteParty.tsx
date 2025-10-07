@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { UserPlus, Mail, Send, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
 
 interface Party {
   email: string;
@@ -36,18 +37,11 @@ export default function InviteParty({ caseId, onSuccess }: InvitePartyProps) {
   const handleInvite = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/cases/${caseId}/invite`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ parties }),
-        }
-      );
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`/cases/${caseId}/invite`, {
+        method: 'POST',
+        body: JSON.stringify({ parties }),
+      });
 
       if (response.ok) {
         const data = await response.json();

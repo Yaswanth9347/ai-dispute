@@ -35,13 +35,12 @@ export default function LoginPage() {
         throw new Error(data.message || data.detail || 'Login failed');
       }
 
-      // Store auth token and user data
-      if (data.token) {
-        localStorage.setItem('auth_token', data.token);
-      }
-      if (data.user) {
-        localStorage.setItem('user_data', JSON.stringify(data.user));
-      }
+      // Support both response shapes: { token, user } and { success, data: { token, user } }
+      const payload = data && data.token ? data : (data && data.data ? data.data : null);
+      if (!payload) throw new Error('Invalid login response');
+
+      if (payload.token) localStorage.setItem('auth_token', payload.token);
+      if (payload.user) localStorage.setItem('user_data', JSON.stringify(payload.user));
       
       // Redirect to dashboard
       router.push('/dashboard');

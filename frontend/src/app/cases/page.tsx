@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/fetchClient';
 
 export default function CasesPage() {
   const [user, setUser] = useState<any>(null);
@@ -24,20 +25,10 @@ export default function CasesPage() {
 
   const fetchCases = async (token: string) => {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-      
-      const response = await fetch(`${API_URL}/cases`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch cases');
-      }
-
+      const response = await apiFetch('/cases');
+      if (!response.ok) throw new Error('Failed to fetch cases');
       const data = await response.json();
-      setCases(data);
+      setCases(data.data || data);
     } catch (err: any) {
       console.error('Error fetching cases:', err);
       setError(err.message);

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/lib/fetchClient';
 
 export default function FileCasePage() {
   const [user, setUser] = useState<any>(null);
@@ -76,16 +77,8 @@ export default function FileCasePage() {
     setIsSubmitting(true);
 
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-      const token = localStorage.getItem('auth_token');
-
-      // Create the case
-      const response = await fetch(`${API_URL}/cases`, {
+      const response = await apiFetch('/cases', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
         body: JSON.stringify({
           title: formData.title,
           filed_by: user.id,
@@ -94,8 +87,8 @@ export default function FileCasePage() {
           description: formData.description,
           dispute_amount: formData.disputeAmount,
           other_party_name: formData.otherPartyName,
-          other_party_email: formData.otherPartyEmail
-        })
+          other_party_email: formData.otherPartyEmail,
+        }),
       });
 
       if (!response.ok) {
@@ -111,13 +104,7 @@ export default function FileCasePage() {
         formDataWithFile.append('file', formData.evidence);
         formDataWithFile.append('uploader_id', user.id);
 
-        await fetch(`${API_URL}/cases/${newCase.id}/evidence`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          },
-          body: formDataWithFile
-        });
+        await apiFetch(`/cases/${newCase.id}/evidence`, { method: 'POST', body: formDataWithFile });
       }
 
       alert('Case filed successfully!');

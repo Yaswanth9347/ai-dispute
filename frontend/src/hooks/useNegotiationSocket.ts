@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import getSocket from '@/lib/socket';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
@@ -17,10 +18,11 @@ interface NegotiationUpdate {
 
 interface UseNegotiationSocketProps {
   negotiationId: string | null;
+  caseId?: string | null;
   onUpdate?: (data: NegotiationUpdate) => void;
 }
 
-export function useNegotiationSocket({ negotiationId, onUpdate }: UseNegotiationSocketProps) {
+export function useNegotiationSocket({ negotiationId, caseId, onUpdate }: UseNegotiationSocketProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<NegotiationUpdate | null>(null);
@@ -28,18 +30,25 @@ export function useNegotiationSocket({ negotiationId, onUpdate }: UseNegotiation
   useEffect(() => {
     if (!negotiationId) return;
 
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('auth_token');
     if (!token) return;
 
-    const socketInstance = io(API_URL, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    });
+    const socketInstance = getSocket(token);
 
     socketInstance.on('connect', () => {
       console.log('✅ Socket connected');
       setIsConnected(true);
-      socketInstance.emit('join:negotiation', negotiationId);
+      // join negotiation-specific room (backwards compatibility)
+      try { socketInstance.emit('join-negotiation', negotiationId); } catch (e) {}
+      // if a caseId is provided use the canonical case room join
+      // (some parts of the app use case rooms: `case-{caseId}`)
+      // Accept either prop names for compatibility with different code paths
+      try {
+        const joinId = caseId || (negotiationId as unknown as string);
+        if (joinId) {
+          socketInstance.emit('join-case', { case_id: joinId });
+        }
+      } catch (e) {}
     });
 
     socketInstance.on('disconnect', () => {
@@ -47,41 +56,74 @@ export function useNegotiationSocket({ negotiationId, onUpdate }: UseNegotiation
       setIsConnected(false);
     });
 
-    socketInstance.on('negotiation:update', (data: NegotiationUpdate) => {
+    // Support both colon-separated and hyphen-separated event names for compatibility
+    const handleUpdate = (data: NegotiationUpdate) => {
       console.log('📨 Negotiation update:', data);
       setLastUpdate(data);
       onUpdate?.(data);
-    });
+    };
 
-    socketInstance.on('negotiation:proposal', (data: NegotiationUpdate) => {
+    const handleProposal = (data: NegotiationUpdate) => {
       console.log('💰 New proposal:', data);
       setLastUpdate(data);
       onUpdate?.(data);
-    });
+    };
 
-    socketInstance.on('negotiation:accepted', (data: NegotiationUpdate) => {
+    const handleAccepted = (data: NegotiationUpdate) => {
       console.log('✅ Proposal accepted:', data);
       setLastUpdate(data);
       onUpdate?.(data);
-    });
+    };
 
-    socketInstance.on('negotiation:rejected', (data: NegotiationUpdate) => {
+    const handleRejected = (data: NegotiationUpdate) => {
       console.log('❌ Proposal rejected:', data);
       setLastUpdate(data);
       onUpdate?.(data);
-    });
+    };
 
-    socketInstance.on('negotiation:timeout', (data: NegotiationUpdate) => {
+    const handleTimeout = (data: NegotiationUpdate) => {
       console.log('⏰ Negotiation timeout:', data);
       setLastUpdate(data);
       onUpdate?.(data);
+    };
+
+    // colon-style
+    socketInstance.on('negotiation:update', handleUpdate);
+    socketInstance.on('negotiation:proposal', handleProposal);
+    socketInstance.on('negotiation:accepted', handleAccepted);
+    socketInstance.on('negotiation:rejected', handleRejected);
+    socketInstance.on('negotiation:timeout', handleTimeout);
+    // hyphen-style (backend compatibility)
+    socketInstance.on('negotiation-update', handleUpdate);
+    socketInstance.on('negotiation-proposal', handleProposal);
+    socketInstance.on('negotiation-accepted', handleAccepted);
+    socketInstance.on('negotiation-rejected', handleRejected);
+    socketInstance.on('negotiation-timeout', handleTimeout);
+    // backend also emits negotiation-new-round for new rounds
+    socketInstance.on('negotiation-new-round', (data: any) => {
+      console.log('🔄 Negotiation new round:', data);
+      // forward as an update as well
+      handleUpdate(data as NegotiationUpdate);
     });
 
-    setSocket(socketInstance);
+    setSocket(socketInstance as Socket);
 
     return () => {
-      socketInstance.emit('leave:negotiation', negotiationId);
-      socketInstance.disconnect();
+  try { socketInstance.emit('leave-negotiation', negotiationId); } catch (e) {}
+  try { socketInstance.emit('leave-case', { case_id: caseId || negotiationId }); } catch (e) {}
+
+      // remove listeners we attached
+      socketInstance.off('negotiation:update', handleUpdate);
+      socketInstance.off('negotiation:proposal', handleProposal);
+      socketInstance.off('negotiation:accepted', handleAccepted);
+      socketInstance.off('negotiation:rejected', handleRejected);
+      socketInstance.off('negotiation:timeout', handleTimeout);
+      socketInstance.off('negotiation-update', handleUpdate);
+      socketInstance.off('negotiation-proposal', handleProposal);
+      socketInstance.off('negotiation-accepted', handleAccepted);
+      socketInstance.off('negotiation-rejected', handleRejected);
+      socketInstance.off('negotiation-timeout', handleTimeout);
+      socketInstance.off('negotiation-new-round');
     };
   }, [negotiationId, onUpdate]);
 

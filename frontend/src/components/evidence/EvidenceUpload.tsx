@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { apiFetch } from '@/lib/fetchClient';
 import { useDropzone } from 'react-dropzone';
 import { Upload, File, X, CheckCircle, AlertCircle, Eye, Download } from 'lucide-react';
 
@@ -50,48 +51,44 @@ export default function EvidenceUpload({ caseId, onUploadComplete }: EvidenceUpl
         // Upload file
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('caseId', caseId);
+        formData.append('case_id', caseId);
         formData.append('type', 'evidence');
-
-        const token = localStorage.getItem('token');
-        const uploadResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/cases/${caseId}/evidence`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-            body: formData,
+        // include uploader id if available
+        try {
+          const userData = localStorage.getItem('user_data');
+          if (userData) {
+            const user = JSON.parse(userData);
+            if (user?.id) formData.append('uploader_id', user.id);
           }
-        );
+        } catch (e) {}
+
+        const uploadResponse = await apiFetch('/evidence/upload', {
+          method: 'POST',
+          body: formData,
+        });
 
         if (!uploadResponse.ok) throw new Error('Upload failed');
 
-        const uploadData = await uploadResponse.json();
+  const uploadData = await uploadResponse.json();
 
         // Update status to analyzing
+        // use returned publicUrl for preview if available
+        const publicUrl = uploadData.publicUrl || uploadData.storagePath ? uploadData.publicUrl : undefined;
         setFiles((prev) =>
           prev.map((f) =>
-            f.id === uploadedFile.id ? { ...f, status: 'analyzing', url: uploadData.url } : f
+            f.id === uploadedFile.id ? { ...f, status: 'analyzing', url: publicUrl } : f
           )
         );
 
         // Request AI analysis
-        const analysisResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/ai/analyze-evidence`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              caseId,
-              evidenceId: uploadData.data?.id,
-              fileUrl: uploadData.url,
-            }),
-          }
-        );
+        const analysisResponse = await apiFetch('/ai/analyze-evidence', {
+          method: 'POST',
+          body: JSON.stringify({
+            caseId,
+            evidenceId: uploadData.data?.id,
+            fileUrl: uploadData.url,
+          }),
+        });
 
         if (analysisResponse.ok) {
           const analysisData = await analysisResponse.json();

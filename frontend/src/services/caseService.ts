@@ -162,7 +162,12 @@ export const settlementService = {
 
   // Download document
   downloadDocument: async (documentId: string): Promise<Blob> => {
-    const response = await fetch(`/api/documents/${documentId}/download`);
+    const response = await fetch(`/api/documents/${documentId}/download`, {
+      credentials: 'include',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('auth_token')}`,
+      },
+    });
     return response.blob();
   },
 };

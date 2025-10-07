@@ -109,80 +109,29 @@ router.get('/:id/timeline', async (req, res) => {
   try {
     const { id } = req.params;
     const { type } = req.query; // Optional filter by event type
-    
-    // Mock timeline data (in production, fetch from database)
-    const timelineEvents = [
-      {
-        id: '1',
-        caseId: id,
-        type: 'case_filed',
-        title: 'Case Filed',
-        description: 'Case was filed in the system',
-        timestamp: new Date(Date.now() - 10 * 24 * 3600000).toISOString(),
-        metadata: { filed_by: 'John Doe' }
-      },
-      {
-        id: '2',
-        caseId: id,
-        type: 'evidence_uploaded',
-        title: 'Evidence Uploaded',
-        description: 'New evidence document was uploaded',
-        timestamp: new Date(Date.now() - 8 * 24 * 3600000).toISOString(),
-        metadata: { fileName: 'contract.pdf', uploadedBy: 'John Doe' }
-      },
-      {
-        id: '3',
-        caseId: id,
-        type: 'ai_analysis',
-        title: 'AI Analysis Complete',
-        description: 'AI analysis of evidence completed',
-        timestamp: new Date(Date.now() - 7 * 24 * 3600000).toISOString(),
-        metadata: { relevanceScore: 85 }
-      },
-      {
-        id: '4',
-        caseId: id,
-        type: 'party_joined',
-        title: 'Party Joined',
-        description: 'Defendant accepted invitation',
-        timestamp: new Date(Date.now() - 5 * 24 * 3600000).toISOString(),
-        metadata: { partyName: 'Jane Smith', role: 'defendant' }
-      },
-      {
-        id: '5',
-        caseId: id,
-        type: 'negotiation_started',
-        title: 'Negotiation Started',
-        description: 'Settlement negotiation initiated',
-        timestamp: new Date(Date.now() - 3 * 24 * 3600000).toISOString(),
-        metadata: {}
-      },
-      {
-        id: '6',
-        caseId: id,
-        type: 'proposal_made',
-        title: 'Proposal Made',
-        description: 'Settlement proposal submitted',
-        timestamp: new Date(Date.now() - 2 * 24 * 3600000).toISOString(),
-        metadata: { amount: 5000, proposedBy: 'John Doe' }
-      },
-      {
-        id: '7',
-        caseId: id,
-        type: 'court_filing',
-        title: 'Court Filing Submitted',
-        description: 'Documents filed with court',
-        timestamp: new Date(Date.now() - 1 * 24 * 3600000).toISOString(),
-        metadata: { courtSystem: 'PACER', filingType: 'Motion' }
-      }
-    ];
-    
+
+    // Use TimelineService to fetch real timeline events from DB
+    const TimelineService = require('../services/TimelineService');
+    const raw = await TimelineService.getCaseTimeline(id, true);
+
+    // Map DB rows to API shape expected by frontend
+    const timelineEvents = (raw || []).map((row) => ({
+      id: String(row.id || row.id),
+      caseId: row.case_id || id,
+      type: row.event_type,
+      title: row.event_title,
+      description: row.event_description,
+      actor: row.actor_name || row.actor_id || 'System',
+      timestamp: row.created_at || row.createdAt || new Date().toISOString(),
+      metadata: row.metadata || {}
+    }));
+
     // Filter by type if provided
     let filtered = timelineEvents;
     if (type && type !== 'all') {
       filtered = timelineEvents.filter(event => event.type === type);
     }
-    
+
     res.json({
       success: true,
       data: filtered
@@ -198,31 +147,61 @@ router.post('/:id/invite', async (req, res) => {
   try {
     const { id } = req.params;
     const { parties } = req.body; // Array of { name, email, role }
-    
+
     if (!parties || !Array.isArray(parties)) {
       return res.status(400).json({ error: 'parties array is required' });
     }
-    
-    // In production, send actual emails and store invitations
-    const invitations = parties.map(party => ({
-      id: uuidv4(),
-      caseId: id,
-      name: party.name,
-      email: party.email,
-      role: party.role,
-      status: 'pending',
-      invitedAt: new Date().toISOString(),
-      token: crypto.randomBytes(32).toString('hex')
-    }));
-    
-    // Mock email sending
-    console.log(`Invitations sent for case ${id}:`, invitations.map(i => i.email));
-    
+
+    // Determine inviter user id (may be provided in tests via body or from authenticated req.user)
+    const inviterUserId = (req.user && req.user.id) ? req.user.id : (req.body.inviter_id || null);
+    if (!inviterUserId) {
+      return res.status(401).json({ error: 'Authentication required to invite parties' });
+    }
+
+    const InvitationService = require('../services/InvitationService');
+
+    const results = [];
+    for (const party of parties) {
+      try {
+        const r = await InvitationService.inviteParty(id, inviterUserId, {
+          email: party.email,
+          name: party.name,
+          role: party.role || 'defendant',
+          message: party.message || null
+        });
+
+        if (r.success) {
+          results.push({
+            name: party.name,
+            email: party.email,
+            status: 'pending',
+            invitation_token: r.invitation_token,
+            invitedAt: (r.invitation && r.invitation.invited_at) || (r.expires_at ? new Date().toISOString() : new Date().toISOString())
+          });
+        } else {
+          results.push({
+            name: party.name,
+            email: party.email,
+            status: 'error',
+            error: r.error || 'Failed to create invitation'
+          });
+        }
+      } catch (e) {
+        results.push({
+          name: party.name,
+          email: party.email,
+          status: 'error',
+          error: e.message || String(e)
+        });
+      }
+    }
+
     res.json({
       success: true,
-      data: invitations,
-      message: `Invitations sent to ${parties.length} ${parties.length === 1 ? 'party' : 'parties'}`
+      data: results,
+      message: `Processed ${results.length} invitation${results.length !== 1 ? 's' : ''}`
     });
+
   } catch (err) {
     console.error('[cases] invite error', err);
     return res.status(500).json({ error: err.message || err });

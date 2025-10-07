@@ -1,7 +1,7 @@
 // backend/src/lib/authMiddleware.js
 const jwt = require('jsonwebtoken');
 const { verifySupabaseToken } = require('./supabaseAuth'); // keep your existing supabase verifier
-const JWT_SECRET = process.env.AUTH_JWT_SECRET || 'dev-secret';
+const JWT_SECRET = process.env.JWT_SECRET || process.env.AUTH_JWT_SECRET || 'dev-secret';
 
 function getTokenFromHeader(req) {
   const h = req.headers.authorization || req.headers.Authorization || '';

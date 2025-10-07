@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -5,6 +6,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
+import { apiFetch } from '@/lib/fetchClient';
 import { 
   TrendingUp, TrendingDown, Users, FileText, 
   CheckCircle, Clock, AlertCircle, Activity 
@@ -29,21 +31,9 @@ export default function AnalyticsDashboard() {
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_URL}/analytics/dashboard?timeframe=${timeframe}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch analytics data');
-      }
-
+  const token = localStorage.getItem('auth_token');
+      const response = await apiFetch(`/analytics/dashboard?timeframe=${timeframe}`);
+      if (!response.ok) throw new Error('Failed to fetch analytics data');
       const result = await response.json();
       setDashboardData(result.data);
     } catch (err: any) {
@@ -120,16 +110,16 @@ export default function AnalyticsDashboard() {
         />
         <MetricCard
           title="Completed Settlements"
-          value={platform.completedSettlements}
-          change={negotiations.successRate + '%'}
+          value={platform.totalSettlements}
+          change={`${negotiations.successRate}%`}
           changeLabel="success rate"
           icon={<CheckCircle className="w-6 h-6 text-purple-600" />}
           trend="up"
         />
         <MetricCard
           title="Court Filings"
-          value={platform.courtFilings}
-          change={courtFilings.successRate + '%'}
+          value={courtFilings.total}
+          change={`${courtFilings.successRate}%`}
           changeLabel="success rate"
           icon={<Activity className="w-6 h-6 text-orange-600" />}
           trend="neutral"
@@ -165,19 +155,19 @@ export default function AnalyticsDashboard() {
           <ResponsiveContainer width="100%" height={300}>
             <PieChart>
               <Pie
-                data={Object.entries(negotiations.byStatus).map(([status, count]) => ({
-                  name: status.replace(/_/g, ' ').toUpperCase(),
-                  value: count
+                data={negotiations.statusDistribution.map((s) => ({
+                  name: s.status.replace(/_/g, ' ').toUpperCase(),
+                  value: s.count
                 }))}
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={(entry: any) => `${entry.name} ${(entry.percent * 100).toFixed(0)}%`}
                 outerRadius={100}
                 fill="#8884d8"
                 dataKey="value"
               >
-                {Object.keys(negotiations.byStatus).map((_, index) => (
+                {negotiations.statusDistribution.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
@@ -204,7 +194,7 @@ export default function AnalyticsDashboard() {
             <div className="flex justify-between items-center">
               <span className="text-gray-600">Average Confidence</span>
               <span className="text-2xl font-bold text-green-600">
-                {(parseFloat(aiPerformance.averageConfidence) * 100).toFixed(1)}%
+                {(aiPerformance.averageConfidence * 100).toFixed(1)}%
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -319,13 +309,13 @@ export default function AnalyticsDashboard() {
         </div>
 
         {/* Filing Status Breakdown */}
-        <div className="mt-6">
+            <div className="mt-6">
           <h3 className="text-sm font-medium text-gray-700 mb-3">Filing Status</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {Object.entries(courtFilings.byStatus).map(([status, count]) => (
-              <div key={status} className="bg-gray-50 rounded-lg p-3">
-                <p className="text-xs text-gray-600">{status.toUpperCase()}</p>
-                <p className="text-xl font-bold text-gray-900">{count}</p>
+            {courtFilings.byStatus.map((s) => (
+              <div key={s.status} className="bg-gray-50 rounded-lg p-3">
+                <p className="text-xs text-gray-600">{s.status.toUpperCase()}</p>
+                <p className="text-xl font-bold text-gray-900">{s.count}</p>
               </div>
             ))}
           </div>
@@ -336,7 +326,16 @@ export default function AnalyticsDashboard() {
 }
 
 // Reusable Metric Card Component
-function MetricCard({ title, value, change, changeLabel, icon, trend }) {
+interface MetricCardProps {
+  title: string;
+  value: number | string;
+  change?: number | string;
+  changeLabel?: string;
+  icon?: React.ReactNode;
+  trend?: 'up' | 'down' | 'neutral';
+}
+
+function MetricCard({ title, value, change, changeLabel, icon, trend }: MetricCardProps) {
   const getTrendIcon = () => {
     if (trend === 'up') return <TrendingUp className="w-4 h-4 text-green-600" />;
     if (trend === 'down') return <TrendingDown className="w-4 h-4 text-red-600" />;

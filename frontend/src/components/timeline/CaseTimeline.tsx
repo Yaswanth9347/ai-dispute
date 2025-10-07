@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { FileText, Users, Gavel, MessageSquare, Clock, CheckCircle, AlertCircle, Send, Scale } from 'lucide-react';
+import { apiFetch } from '@/lib/fetchClient';
+import getSocket from '@/lib/socket';
 
 interface TimelineEvent {
   id: string;
@@ -29,18 +31,13 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
   const fetchTimeline = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const url = filter === 'all' 
-        ? `${process.env.NEXT_PUBLIC_API_URL}/cases/${caseId}/timeline`
-        : `${process.env.NEXT_PUBLIC_API_URL}/cases/${caseId}/timeline?type=${filter}`;
-      
-      const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
+      const path = `/cases/${caseId}/timeline${filter && filter !== 'all' ? `?type=${encodeURIComponent(filter)}` : ''}`;
+      const response = await apiFetch(path);
       if (response.ok) {
-        const data = await response.json();
-        setEvents(data.data || []);
+        const payload = await response.json();
+        // backend returns { success: true, data: [...] }
+        const items = Array.isArray(payload) ? payload : (payload?.data || payload?.items || []);
+        setEvents(items || []);
       }
     } catch (error) {
       console.error('Error fetching timeline:', error);
@@ -48,6 +45,39 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
       setLoading(false);
     }
   };
+
+  // Real-time updates: join case room and refresh timeline on relevant events
+  useEffect(() => {
+    if (!caseId) return;
+
+    const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') || undefined : undefined;
+    const socket = getSocket(token);
+
+    // join canonical case room
+    try {
+      socket.emit('join-case', { case_id: caseId });
+    } catch (e) {
+      // ignore
+    }
+
+    const refresh = () => {
+      // refetch timeline; keep current filter
+      fetchTimeline();
+    };
+
+    socket.on('case-updated', refresh);
+    socket.on('negotiation-proposal', refresh);
+    socket.on('negotiation-new-round', refresh);
+    socket.on('new-message', refresh);
+
+    return () => {
+      try { socket.emit('leave-case', { case_id: caseId }); } catch (e) {}
+      socket.off('case-updated', refresh);
+      socket.off('negotiation-proposal', refresh);
+      socket.off('negotiation-new-round', refresh);
+      socket.off('new-message', refresh);
+    };
+  }, [caseId, filter]);
 
   const getEventIcon = (type: string) => {
     switch (type) {

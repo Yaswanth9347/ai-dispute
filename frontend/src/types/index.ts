@@ -202,7 +202,7 @@ export interface CaseDocument {
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean;
-  message: string;
+  message?: string;
   data?: T;
   error?: string;
 }

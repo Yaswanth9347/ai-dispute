@@ -15,9 +15,12 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: (data: LoginData) => authService.login(data),
     onSuccess: (response) => {
-      if (response.success && response.data) {
-        localStorage.setItem('auth_token', response.data.token);
-        queryClient.setQueryData(authKeys.profile(), response.data.user);
+      // support both shapes: { token, user } and { success: true, data: { token, user } }
+      const anyResp: any = response;
+      const payload = anyResp && anyResp.token ? anyResp : (anyResp && anyResp.data ? anyResp.data : null);
+      if (payload && payload.token) {
+        localStorage.setItem('auth_token', payload.token);
+        if (payload.user) queryClient.setQueryData(authKeys.profile(), payload.user);
       }
     },
   });
@@ -30,9 +33,11 @@ export const useRegister = () => {
   return useMutation({
     mutationFn: (data: RegisterData) => authService.register(data),
     onSuccess: (response) => {
-      if (response.success && response.data) {
-        localStorage.setItem('auth_token', response.data.token);
-        queryClient.setQueryData(authKeys.profile(), response.data.user);
+      const anyResp: any = response;
+      const payload = anyResp && anyResp.token ? anyResp : (anyResp && anyResp.data ? anyResp.data : null);
+      if (payload && payload.token) {
+        localStorage.setItem('auth_token', payload.token);
+        if (payload.user) queryClient.setQueryData(authKeys.profile(), payload.user);
       }
     },
   });

@@ -9,7 +9,7 @@ let userProfiles = new Map();
 // Get user profile
 router.get('/profile', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     
     // Get or create profile
     let profile = userProfiles.get(userId);
@@ -38,7 +38,7 @@ router.get('/profile', requireAuth, async (req, res) => {
 // Update user profile
 router.put('/profile', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     const updates = req.body;
     
     let profile = userProfiles.get(userId) || {
@@ -67,7 +67,7 @@ router.put('/profile', requireAuth, async (req, res) => {
 // Upload avatar
 router.post('/avatar', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     
     // In production, handle file upload to storage (S3, etc.)
     // For now, return a placeholder URL
@@ -90,7 +90,7 @@ router.post('/avatar', requireAuth, async (req, res) => {
 // Update security settings
 router.put('/settings/security', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     const settings = req.body;
     
     // Store settings (in production, save to database)
@@ -123,7 +123,7 @@ router.post('/password/change', requireAuth, async (req, res) => {
 // Delete account
 router.delete('/account', requireAuth, async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.id || req.user.sub;
     
     // In production, soft delete or permanently delete user data
     userProfiles.delete(userId);

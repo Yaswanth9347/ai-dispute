@@ -158,6 +158,9 @@ if (!isTest) {
   app.use('/api/ai', aiChatRouter);
   // Workflow API endpoints (Phase 3)
   app.use('/api/workflows', workflowsRouter);
+  // Dispute Resolution Routes (NEW - Complete Workflow)
+  const disputesRouter = require('./routes/disputes');
+  app.use('/api/disputes', disputesRouter);
 }
 
 // metrics endpoint

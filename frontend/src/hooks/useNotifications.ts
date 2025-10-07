@@ -1,95 +1,121 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { Socket } from 'socket.io-client';
+import getSocket from '@/lib/socket';
+import { apiFetch } from '@/lib/fetchClient';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5000';
-
-interface Notification {
-  id: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+interface AppNotification {
+  notification_id?: string; // DB uses notification_id
+  id?: string; // fallback
+  notification_type?: string;
+  type?: string;
   title: string;
   message: string;
-  timestamp: string;
-  read: boolean;
+  created_at?: string;
+  timestamp?: string;
+  is_read?: boolean;
+  read?: boolean;
+  action_url?: string;
   actionUrl?: string;
+  action_data?: any;
   metadata?: any;
+  case_id?: string | number;
 }
 
 export function useNotifications() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    const socketInstance = io(API_URL, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-    });
-
-    socketInstance.on('connect', () => {
-      console.log('✅ Notifications socket connected');
-      setIsConnected(true);
-      fetchNotifications();
-    });
-
-    socketInstance.on('disconnect', () => {
-      console.log('❌ Notifications socket disconnected');
-      setIsConnected(false);
-    });
-
-    socketInstance.on('notification', (notification: Notification) => {
-      console.log('🔔 New notification:', notification);
-      setNotifications((prev) => [notification, ...prev]);
-      setUnreadCount((prev) => prev + 1);
-      
-      // Show browser notification if permitted
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(notification.title, {
-          body: notification.message,
-          icon: '/icon.png',
-        });
-      }
-    });
-
-    setSocket(socketInstance);
-
-    return () => {
-      socketInstance.disconnect();
-    };
-  }, []);
 
   const fetchNotifications = async () => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.data || []);
-        setUnreadCount(data.data?.filter((n: Notification) => !n.read).length || 0);
-      }
+      const resp = await apiFetch('/notifications');
+      const data = await resp.json();
+      const items: AppNotification[] = (data.data || []).map((n: any) => ({
+        ...n,
+        read: n.is_read ?? n.read,
+        id: n.notification_id || n.id,
+        timestamp: n.created_at || n.timestamp
+      }));
+      setNotifications(items);
+      setUnreadCount(items.filter((n) => !n.read).length || 0);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
   };
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    const socketInstance = getSocket(token);
+
+    const onConnect = () => {
+      console.log('✅ Notifications socket connected');
+      setIsConnected(true);
+      fetchNotifications();
+    };
+
+    const onDisconnect = () => {
+      console.log('❌ Notifications socket disconnected');
+      setIsConnected(false);
+    };
+
+    const onNotification = (notification: any) => {
+      const n: AppNotification = {
+        ...notification,
+        id: notification.notificationId || notification.notification_id || notification.id,
+        read: notification.read ?? notification.is_read ?? false,
+        timestamp: notification.createdAt || notification.created_at || notification.timestamp
+      };
+
+      console.log('🔔 New notification:', n);
+      setNotifications((prev) => [n, ...prev]);
+      setUnreadCount((prev) => prev + (n.read ? 0 : 1));
+
+      // Browser notification
+      try {
+        if ('Notification' in window && Notification.permission === 'granted') {
+          // eslint-disable-next-line no-new
+          new (window as any).Notification(n.title, {
+            body: n.message,
+            icon: '/icon.png'
+          });
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+
+    socketInstance.on('connect', onConnect);
+    socketInstance.on('disconnect', onDisconnect);
+    socketInstance.on('notification', onNotification);
+    socketInstance.on('case_notification', onNotification);
+
+    setSocket(socketInstance as Socket);
+
+    return () => {
+      try {
+        socketInstance.off('connect', onConnect);
+        socketInstance.off('disconnect', onDisconnect);
+        socketInstance.off('notification', onNotification);
+        socketInstance.off('case_notification', onNotification);
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, []);
+
   const markAsRead = useCallback(async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}/read`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch(`/notifications/${notificationId}/read`, { method: 'PUT' });
 
       setNotifications((prev) =>
-        prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        prev.map((n) => (n.id === notificationId || n.notification_id === notificationId ? { ...n, read: true } : n))
       );
       setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (error) {
@@ -99,11 +125,7 @@ export function useNotifications() {
 
   const markAllAsRead = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/read-all`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch('/notifications/read-all', { method: 'PUT' });
 
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
       setUnreadCount(0);
@@ -114,21 +136,17 @@ export function useNotifications() {
 
   const deleteNotification = useCallback(async (notificationId: string) => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/notifications/${notificationId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await apiFetch(`/notifications/${notificationId}`, { method: 'DELETE' });
 
-      setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
+      setNotifications((prev) => prev.filter((n) => !(n.id === notificationId || n.notification_id === notificationId)));
     } catch (error) {
       console.error('Error deleting notification:', error);
     }
   }, []);
 
   const requestPermission = useCallback(async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      await Notification.requestPermission();
+    if (typeof window !== 'undefined' && 'Notification' in window && (window as any).Notification.permission === 'default') {
+      await (window as any).Notification.requestPermission();
     }
   }, []);
 
