@@ -1,6 +1,74 @@
-node_modules/
+# Environment variables
 .env
-dist/
-build/
-cases/
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+frontend/.env.local
 
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+package-lock.json
+
+# Build outputs
+frontend/.next/
+frontend/out/
+backend/dist/
+backend/build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+backend/backend.log
+nohup.out
+
+# OS files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# Database
+*.sqlite
+*.db
+data/
+backend/data/
+supabase/
+
+# Uploads
+backend/uploads/
+backend/public/uploads/
+
+# Temp
+tmp/
+temp/
+*.tmp
+*.cache
+.cache/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Process files
+*.pid
+
+# Certificates
+*.pem
+*.key
+*.crt
+
+# Local Supabase
+supabase/.branches/
+supabase/.temp/
