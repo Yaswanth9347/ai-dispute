@@ -39,8 +39,9 @@ export default function ESignature({ caseId, documentId }: ESignatureProps) {
   const loadSignatureStatus = async () => {
     try {
       setLoading(true);
-      const response = await apiRequest.get<any>(`/disputes/${caseId}/signature-status`);
-      setSignatures(response.signatures || []);
+  const response = await apiRequest.get<any>(`/disputes/${caseId}/signature-status`);
+  // apiRequest returns ApiResponse<T> shape { success, data, message }
+  setSignatures((response as any)?.data?.signatures || []);
     } catch (error) {
       console.error('Error loading signature status:', error);
     } finally {
@@ -61,7 +62,7 @@ export default function ESignature({ caseId, documentId }: ESignatureProps) {
         }
       );
 
-      setSignatureId(response.signatureId);
+  setSignatureId((response as any)?.data?.signatureId);
       setOtpSent(true);
       setSuccess('OTP sent to your registered email/phone!');
     } catch (error: any) {

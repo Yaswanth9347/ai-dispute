@@ -14,6 +14,15 @@ try { promClient = require('prom-client'); } catch (e) { promClient = null; }
 
 const app = express();
 
+// Ensure uploads directory exists on startup
+const fs = require('fs');
+const uploadsDir = require('path').join(__dirname, 'uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+  console.warn('Could not create uploads directory:', e.message);
+}
+
 // Allow multiple frontend ports
 const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000'];
 
@@ -107,7 +116,7 @@ if (!isTest) {
   // Notification Routes (Phase 3 - Real-time)
   const notificationsRouter = require('./controllers/NotificationController');
   // User Profile Routes (Phase 3)
-  const usersRouter = require('./controllers/UserController');
+  const usersRouter = require('./routes/user');
   // AI Chat Routes (Phase 3)
   const aiChatRouter = require('./controllers/AIChatController');
   // Workflow Automation Routes (Phase 3)
@@ -154,6 +163,8 @@ if (!isTest) {
   app.use('/api/notifications', notificationsRouter);
   // User Profile API endpoints (Phase 3)
   app.use('/api/users', usersRouter);
+// Serve uploaded profile photos statically
+app.use('/uploads', express.static('uploads'));
   // AI Chat API endpoints (Phase 3)
   app.use('/api/ai', aiChatRouter);
   // Workflow API endpoints (Phase 3)
