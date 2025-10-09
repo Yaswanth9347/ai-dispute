@@ -1,0 +1,24 @@
+{
+  "2f4393f3-c16c-4991-a8fd-6590213b85ec": {
+    "id": "2f4393f3-c16c-4991-a8fd-6590213b85ec",
+    "name": "Yassu",
+    "email": "yaswanthyerra2025@gmail.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "http://localhost:8080/uploads/1759945714377-789042964.png",
+    "bio": "",
+    "createdAt": "2025-10-08T14:53:46.985Z"
+  },
+  "ac9154b1-1ff3-4f0f-a65d-703a9e08ab66": {
+    "id": "ac9154b1-1ff3-4f0f-a65d-703a9e08ab66",
+    "name": "Tester",
+    "email": "testing@gmail.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "http://localhost:8080/uploads/1760011206648-132542437.jpg",
+    "bio": "",
+    "createdAt": "2025-10-09T11:59:39.267Z"
+  }
+}
