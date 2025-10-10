@@ -1,10 +1,4 @@
 {
-  "/settings/page": "app/settings/page.js",
-  "/page": "app/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/analytics/page": "app/analytics/page.js",
-  "/cases/page": "app/cases/page.js",
-  "/ai-assistant/page": "app/ai-assistant/page.js",
-  "/workflow/page": "app/workflow/page.js",
-  "/automation/page": "app/automation/page.js"
+  "/profile/page": "app/profile/page.js",
+  "/page": "app/page.js"
 }
