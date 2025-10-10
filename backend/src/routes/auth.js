@@ -34,6 +34,8 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   name: z.string().min(1).optional(),
+  phone_number: z.string().optional(),
+  district_pin: z.string().optional(),
 });
 
 const loginSchema = z.object({
@@ -70,6 +72,24 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
       if (e instanceof HttpError) throw e;
       console.error('signInWithPassword err', e);
       throw new HttpError(500, 'auth_signin_failed', 'Authentication failed', e);
+    }
+  }
+
+  // If email+password provided but supabase auth client not available, attempt local password check
+  if (email && password) {
+    try {
+      const { data: row, error: rowErr } = await supabase.from('users').select('id,email,name,password').eq('email', email).limit(1).maybeSingle();
+      if (rowErr || !row) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      if (!row.password) return res.status(500).json({ success: false, message: 'Server not configured for password auth' });
+      const match = await bcrypt.compare(password, row.password);
+      if (!match) return res.status(401).json({ success: false, message: 'Invalid credentials' });
+      const now = Math.floor(Date.now() / 1000);
+      const payload = { sub: row.id, email: row.email || null, name: row.name || null, iat: now };
+      const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+      return res.json({ success: true, data: { token, expires_at: new Date((now + AUTH_EXP) * 1000).toISOString(), user: { id: row.id, email: row.email, name: row.name } } });
+    } catch (e) {
+      console.error('local password login err', e);
+      return res.status(500).json({ success: false, message: 'Authentication failed', detail: e && e.message ? e.message : e });
     }
   }
 
@@ -115,20 +135,28 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
 // body: { email: "<string>", password: "<string>", name?: "<string>" }
 router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(async (req, res) => {
   const { email, password, name } = req.body;
+  const { phone_number, district_pin } = req.body;
 
   // If Supabase auth admin is available, create a user there (requires service role key)
   if (supabase && supabase.auth && supabase.auth.admin && typeof supabase.auth.admin.createUser === 'function') {
     const opts = { email, password, user_metadata: {} };
     if (name) opts.user_metadata.name = name;
-    // optional: allow auto-confirm for dev if SUPABASE_AUTO_CONFIRM=true
-    if (process.env.SUPABASE_AUTO_CONFIRM === 'true') {
-      opts.email_confirm = true; // best-effort option; Supabase admin accepts email_confirm/email_confirmed in different versions
+    // optional: allow auto-confirm for dev. Default to auto-confirm in non-production when using service role key
+    const autoConfirmEnabled = (typeof process.env.SUPABASE_AUTO_CONFIRM !== 'undefined') ? (process.env.SUPABASE_AUTO_CONFIRM === 'true') : (process.env.NODE_ENV !== 'production');
+    if (autoConfirmEnabled) {
+      // best-effort flags for different versions of supabase auth-js
+      opts.email_confirm = true;
       opts.email_confirmed = true;
     }
     try {
       const { data: createData, error: createErr } = await supabase.auth.admin.createUser(opts);
       if (createErr) {
         console.error('supabase.auth.admin.createUser error', createErr);
+        // If email already exists provide a clear conflict response
+        const isEmailExists = (createErr && (createErr.code === 'email_exists' || (createErr.message && String(createErr.message).toLowerCase().includes('already been registered')) || createErr.__isAuthError));
+        if (isEmailExists) {
+          return res.status(409).json({ success: false, message: 'Email already registered. Please login or use password reset.' , detail: createErr });
+        }
         // return diagnostic (development)
         return res.status(500).json({ success: false, message: 'Failed to create auth user', detail: createErr });
       }
@@ -138,6 +166,8 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
       try {
         const profile = { id: createdUser.id, email: createdUser.email };
         if (name) profile.name = name;
+        if (phone_number) profile.phone_number = phone_number;
+        if (district_pin) profile.district_pin = district_pin;
         await supabase.from('users').insert([profile]);
       } catch (profileErr) {
         console.warn('failed to insert profile row after auth create', profileErr);
@@ -154,6 +184,10 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
       return res.status(201).json({ success: true, data: { user: { id: createdUser.id, email: createdUser.email, name: name || null } } });
     } catch (e) {
       console.error('register(createUser) err', e);
+      // Handle Supabase Auth errors (e.g., email already exists) gracefully
+      if (e && (e.code === 'email_exists' || e.__isAuthError)) {
+        return res.status(409).json({ success: false, message: 'Email already registered. Please login or use password reset.', detail: e });
+      }
       if (e instanceof HttpError) throw e;
       throw new HttpError(500, 'register_failed', 'Failed to register user', e);
     }
@@ -167,6 +201,8 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
     const hashedPassword = await bcrypt.hash(password, 10);
     const insertObj = { email, password: hashedPassword };
     if (name) insertObj.name = name;
+    if (phone_number) insertObj.phone_number = phone_number;
+    if (district_pin) insertObj.district_pin = district_pin;
     const { data, error } = await supabase.from('users').insert([insertObj]).select().single();
     if (error) {
       console.error('supabase insert error fallback', error);
@@ -178,6 +214,58 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
     // schema doesn't support password or supabase auth not configured
     throw new HttpError(500, 'no_auth_backend', 'Server not configured to create users. Configure Supabase Auth (service role key) or add a password column to users table', fallbackErr);
   }
+}));
+
+// Forgot password: POST /api/auth/forgot-password
+// body: { email }
+router.post('/forgot-password', validate.zod({ body: z.object({ email: z.string().email() }) }), asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  // find user
+  const { data: user, error } = await supabase.from('users').select('id,email,name').eq('email', email).limit(1).maybeSingle();
+  if (error || !user) {
+    // don't reveal whether email exists
+    return res.json({ success: true, message: 'If an account exists, a password reset link was sent to the email address' });
+  }
+
+  // create a reset token and store its hash + expiry (1 hour)
+  const crypto = require('crypto');
+  const token = crypto.randomBytes(24).toString('hex');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+
+  await supabase.from('users').update({ reset_token_hash: tokenHash, reset_token_expires_at: expiresAt }).eq('id', user.id);
+
+  // send email with reset link
+  const frontend = process.env.FRONTEND_URL || 'http://localhost:3001';
+  const resetUrl = `${frontend}/auth/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+  const { sendEmail } = require('../lib/mailer');
+  try {
+    await sendEmail({ to: email, subject: 'Password reset for AI Dispute Resolver', template: true, data: { invitation_message: `Click the link to reset your password: ${resetUrl}`, invitation_url: resetUrl } });
+  } catch (mailErr) {
+    console.warn('forgot-password mail send failed', mailErr);
+  }
+
+  return res.json({ success: true, message: 'If an account exists, a password reset link was sent to the email address' });
+}));
+
+// Reset password: POST /api/auth/reset-password
+// body: { token, password, email }
+router.post('/reset-password', validate.zod({ body: z.object({ token: z.string(), password: z.string().min(8), email: z.string().email() }) }), asyncHandler(async (req, res) => {
+  const { token, password, email } = req.body;
+  const crypto = require('crypto');
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+  const { data: user, error } = await supabase.from('users').select('id,reset_token_hash,reset_token_expires_at').eq('email', email).limit(1).maybeSingle();
+  if (error || !user) return res.status(400).json({ success: false, message: 'Invalid token or email' });
+
+  if (!user.reset_token_hash || !user.reset_token_expires_at) return res.status(400).json({ success: false, message: 'No reset request found' });
+  if (user.reset_token_hash !== tokenHash) return res.status(400).json({ success: false, message: 'Invalid token' });
+  if (new Date(user.reset_token_expires_at) < new Date()) return res.status(400).json({ success: false, message: 'Token expired' });
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  await supabase.from('users').update({ password: hashedPassword, reset_token_hash: null, reset_token_expires_at: null }).eq('id', user.id);
+
+  return res.json({ success: true, message: 'Password reset successful' });
 }));
 
 // Token refresh endpoint: POST /api/auth/refresh

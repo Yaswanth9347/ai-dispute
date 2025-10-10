@@ -7,7 +7,7 @@
     "test": "jest --runInBand --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "dev": "nodemon src/index.js",
+    "dev": "nodemon --cwd /home/yaswanth/Yassu/ai-dispute/backend src/index.js",
     "start": "node src/index.js",
     "process": "node -r dotenv/config -e \"require('./src/lib/mediaWorker').processEvidence(process.argv[1]).then(r=>console.log(JSON.stringify(r,null,2))).catch(e=>console.error(e))\" --"
   },
