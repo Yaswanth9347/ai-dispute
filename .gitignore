@@ -24,7 +24,7 @@ build/
 cases/
 
 # Next.js build output
-frontend/.next
+/frontend/.next
 frontend/out
 
 # Cache and temporary files
