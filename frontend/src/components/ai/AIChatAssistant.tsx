@@ -1,7 +1,7 @@
-'use client';
+ 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Sparkles, Loader2, Mic } from 'lucide-react';
+import { Send, Loader2, Mic, RefreshCw, X } from 'lucide-react';
 import { API_URL } from '@/lib/fetchClient';
 
 interface Message {
@@ -28,17 +28,35 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesRef = useRef<Message[]>(messages);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inputContainerRef = useRef<HTMLDivElement | null>(null);
   const [inputSpacerHeight, setInputSpacerHeight] = useState<number>(72);
   const [isRecording, setIsRecording] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const finalTranscriptRef = useRef<string>('');
   const origInputRef = useRef<string>('');
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages, loading]);
+
+  // keep a ref copy of messages to avoid stale closures when sending
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  // abort active streaming request when unmounting
+  useEffect(() => {
+    return () => {
+      try {
+        abortControllerRef.current?.abort();
+      } catch {}
+      abortControllerRef.current = null;
+    };
+  }, []);
 
   // On mount, try to load persisted conversation from backend so refresh
   // preserves chat history. If fetching fails (401 or network), keep default.
@@ -122,6 +140,12 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
   }, [input]);
 
   const handleSend = async () => {
+    // If the user is recording, stop recognition and wait for final transcript
+    // to be merged into `input` before sending.
+    try {
+      await stopRecognition();
+    } catch {}
+
     if (!input.trim()) return;
 
     const userMessage: Message = {
@@ -138,15 +162,24 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
     // normalize api base before network call so error handling can reference it
     const apiBase = API_URL.replace(/\/api\/?$/, '');
 
-    try {
-      const conversationHistory = [...messages, userMessage].map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
+    // ensure previous controller is aborted
+    if (abortControllerRef.current) {
+      try {
+        abortControllerRef.current.abort();
+      } catch {}
+      abortControllerRef.current = null;
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  // Normalize API base: strip trailing /api or /api/ to avoid double slashes
-  const url = `${apiBase}/api/ai/stream`;
+    try {
+      // use messagesRef to avoid stale closure issues
+      const baseHistory = Array.isArray(messagesRef.current) ? messagesRef.current : [];
+      const conversationHistory = [...baseHistory, userMessage].map((m) => ({ role: m.role, content: m.content }));
+
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      // Normalize API base: strip trailing /api or /api/ to avoid double slashes
+      const url = `${apiBase}/api/ai/stream`;
       const body = JSON.stringify({ message: userMessage.content, caseId, conversationHistory });
 
       const resp = await fetch(url, {
@@ -156,6 +189,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body,
+        signal: controller.signal,
       });
 
       if (!resp.ok) {
@@ -264,12 +298,17 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
       try {
         await reader.releaseLock?.();
       } catch {}
+      try {
+        abortControllerRef.current = null;
+      } catch {}
     } catch (err) {
       // Distinguish network-level failures (TypeError) from HTTP errors
       const msg = (err as any)?.message || String(err);
       let friendly = `⚠️ I encountered an issue while processing your request. ${msg}`;
       // common browser network error message is 'Failed to fetch' (TypeError)
-      if (/failed to fetch/i.test(msg) || /network/i.test(msg)) {
+      if (/abort/i.test(msg)) {
+        friendly = '⚠️ Stream cancelled.';
+      } else if (/failed to fetch/i.test(msg) || /network/i.test(msg)) {
         friendly = `⚠️ Network error: could not reach the backend at ${apiBase || API_URL}. Is the backend running? Check the browser console for CORS or network errors.`;
       }
       const errorMessage: Message = {
@@ -282,6 +321,15 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cancel currently active stream
+  const handleCancelStream = () => {
+    try {
+      abortControllerRef.current?.abort();
+    } catch {}
+    abortControllerRef.current = null;
+    setLoading(false);
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -303,7 +351,25 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.lang = 'en-IN';
+
+      // Inspect recent conversation + current input to pick a reasonable
+      // recognition language. Prefer Telugu (te-IN) when Telugu script
+      // present, Devanagari (hi-IN) when Devanagari present, else English.
+      const combined = (messagesRef.current || []).map((m) => m.content).join('\n') + '\n' + (input || '');
+      let langCode = 'en-IN';
+      try {
+        if (/[\u0C00-\u0C7F]/.test(combined) || /[\u0C00-\u0C7F]/.test(input)) {
+          langCode = 'te-IN';
+        } else if (/[\u0900-\u097F]/.test(combined) || /[\u0900-\u097F]/.test(input)) {
+          langCode = 'hi-IN';
+        } else {
+          langCode = 'en-IN';
+        }
+      } catch (e) {
+        langCode = 'en-IN';
+      }
+
+      recognition.lang = langCode;
       recognition.interimResults = true;
       recognition.continuous = true;
 
@@ -355,15 +421,44 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
     }
   };
 
-  const stopRecognition = () => {
+  // Stop recognition and return a promise that resolves when the
+  // recognition's `onend` handler fires so final transcript is applied.
+  const stopRecognition = (): Promise<void> => {
     const rec = recognitionRef.current;
-    if (rec) {
+    if (!rec) {
+      setIsRecording(false);
+      recognitionRef.current = null;
+      return Promise.resolve();
+    }
+
+    return new Promise((resolve) => {
+      // Preserve any existing onend handler and call it before resolving.
+      const prevOnEnd = rec.onend;
+      rec.onend = (ev: any) => {
+        try {
+          if (typeof prevOnEnd === 'function') prevOnEnd(ev);
+        } catch (e) {
+          console.error('Error in previous onend handler', e);
+        }
+        try {
+          setIsRecording(false);
+        } catch {}
+        recognitionRef.current = null;
+        resolve();
+      };
+
       try {
         rec.stop();
-      } catch {}
-    }
-    setIsRecording(false);
-    recognitionRef.current = null;
+      } catch (e) {
+        // If stop throws synchronously, resolve to avoid blocking.
+        console.warn('recognition.stop() threw', e);
+        try {
+          setIsRecording(false);
+        } catch {}
+        recognitionRef.current = null;
+        resolve();
+      }
+    });
   };
 
   const toggleRecording = () => {
@@ -372,23 +467,75 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
   };
 
   return (
-  <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 via-white to-gray-100 rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-  <div className="flex items-center gap-3 p-5 border-b border-gray-200 bg-white/70 backdrop-blur-md">
-        <div className="relative w-12 h-12">
-          <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 blur-lg opacity-60"></div>
-          <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full shadow-lg">
-            <Sparkles className="w-6 h-6 text-white" />
-          </div>
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-gray-900">AI Legal Assistant</h3>
-          <p className="text-sm text-gray-500">Your professional AI legal companion</p>
-        </div>
+    <div className="relative flex flex-col h-full bg-gradient-to-b from-gray-50 via-white to-gray-100 rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+      {/* Reset button (top-right) — kept visible but header/ avatar removed per design */}
+      <div className="absolute top-3 right-3 z-20">
+        <button
+          type="button"
+          onClick={() => setShowResetConfirm(true)}
+          className="p-2 rounded-full bg-white border text-gray-700 hover:bg-gray-50 shadow"
+          title="Reset Conversation"
+          aria-label="Reset conversation"
+        >
+          <RefreshCw className="w-4 h-4" />
+        </button>
       </div>
 
+      {/* Confirmation modal for reset */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setShowResetConfirm(false)} />
+          <div className="relative z-10 w-full max-w-md mx-4 bg-white rounded-lg shadow-lg border">
+            <div className="p-4">
+              <h4 className="text-lg font-semibold text-gray-900">Reset conversation?</h4>
+              <p className="text-sm text-gray-600 mt-2">This will clear the current chat history for this account. This action cannot be undone.</p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-3 py-2 rounded-md bg-white border text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const apiBase = API_URL.replace(/\/api\/?$/, '');
+                      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+                      await fetch(`${apiBase}/api/ai/conversation`, {
+                        method: 'DELETE',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                        },
+                      });
+                    } catch (e) {
+                      // ignore
+                    }
+                    setMessages([
+                      {
+                        id: '1',
+                        role: 'assistant',
+                        content:
+                          "👋 Hello! I’m your AI Legal Assistant — ready to help you understand your case, explain legal terms, and suggest fair strategies. How can I assist you today?",
+                        timestamp: new Date().toISOString(),
+                      },
+                    ]);
+                    setShowResetConfirm(false);
+                  }}
+                  className="px-3 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700"
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Messages */}
-  <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth relative">
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 scroll-smooth relative">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -453,40 +600,19 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
           >
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
           </button>
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const apiBase = API_URL.replace(/\/api\/?$/, '');
-                const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-                await fetch(`${apiBase}/api/ai/conversation`, {
-                  method: 'DELETE',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                  },
-                });
-              } catch (e) {
-                // ignore
-              }
-              // reset UI state
-              setMessages([
-                {
-                  id: '1',
-                  role: 'assistant',
-                  content:
-                    "👋 Hello! I’m your AI Legal Assistant — ready to help you understand your case, explain legal terms, and suggest fair strategies. How can I assist you today?",
-                  timestamp: new Date().toISOString(),
-                },
-              ]);
-            }}
-            className="ml-2 px-3 py-2 rounded-xl bg-white border text-sm text-gray-700 hover:bg-gray-50"
-            title="Reset Conversation"
-          >
-            Reset
-          </button>
+          {loading && (
+            <button
+              type="button"
+              onClick={handleCancelStream}
+              className="ml-2 p-3 rounded-full bg-white border text-gray-700 hover:bg-gray-50"
+              title="Cancel"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>
   );
 }
+

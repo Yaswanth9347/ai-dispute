@@ -20,5 +20,16 @@
     "avatar": "http://localhost:8080/uploads/1760011206648-132542437.jpg",
     "bio": "",
     "createdAt": "2025-10-09T11:59:39.267Z"
+  },
+  "3b112cce-027e-449b-a31f-6bb884869dd8": {
+    "id": "3b112cce-027e-449b-a31f-6bb884869dd8",
+    "name": "Mouli",
+    "email": "mouli@gmail.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "",
+    "bio": "",
+    "createdAt": "2025-10-11T17:40:31.899Z"
   }
 }
