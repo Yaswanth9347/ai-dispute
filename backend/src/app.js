@@ -23,18 +23,24 @@ try {
   console.warn('Could not create uploads directory:', e.message);
 }
 
-// Allow multiple frontend ports
-const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000'];
+// Allow multiple frontend ports and local hosts (development convenience)
+const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http://localhost:3000', 'http://127.0.0.1:3000'];
 
 // basic middleware
 if (pinoHttp) app.use(pinoHttp);
 app.use(cors({ 
   origin: function(origin, callback) {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
+    // allow requests with no origin (mobile clients, curl, Postman) or same-origin
+    if (!origin) return callback(null, true);
+    try {
+      const url = new URL(origin);
+      // allow localhost or 127.0.0.1 with any port during development
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return callback(null, true);
+    } catch (e) {
+      // fall back to exact match
     }
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true 
 }));
