@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Users, Gavel, MessageSquare, Clock, CheckCircle, AlertCircle, Send, Scale } from 'lucide-react';
 import { apiFetch } from '@/lib/fetchClient';
+import { formatINR } from '@/lib/formatCurrency';
 import getSocket from '@/lib/socket';
 
 interface TimelineEvent {
@@ -203,7 +204,7 @@ export default function CaseTimeline({ caseId }: CaseTimelineProps) {
                       <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm">
                         {event.metadata.amount && (
                           <p className="text-gray-700">
-                            <span className="font-medium">Amount:</span> ${event.metadata.amount.toLocaleString()}
+                            <span className="font-medium">Amount:</span> {formatINR(event.metadata.amount)}
                           </p>
                         )}
                         {event.metadata.status && (

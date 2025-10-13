@@ -28,6 +28,28 @@ const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002', 'http:
 
 // basic middleware
 if (pinoHttp) app.use(pinoHttp);
+
+// Robust CORS handler: set headers explicitly to avoid preflight issues.
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  try {
+    const url = new URL(origin);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || allowedOrigins.indexOf(origin) !== -1) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,Accept');
+      // Make sure preflight requests are handled quickly
+      if (req.method === 'OPTIONS') return res.status(204).end();
+    }
+  } catch (e) {
+    // ignore invalid origin
+  }
+  next();
+});
+
+// also keep the express/cors middleware as a fallback
 app.use(cors({ 
   origin: function(origin, callback) {
     // allow requests with no origin (mobile clients, curl, Postman) or same-origin
@@ -195,3 +217,20 @@ module.exports = app;
 // Tests often destructure createServer — provide a helper while keeping
 // the default export as the app instance to avoid breaking runtime imports.
 module.exports.createServer = () => app;
+
+// Global error handler: ensure all errors return JSON so clients (and the frontend)
+// can reliably parse error responses instead of getting HTML 500 pages.
+app.use((err, req, res, next) => {
+  try {
+    console.error('Unhandled error:', err && err.stack ? err.stack : err);
+  } catch (loggingErr) {
+    // ignore
+  }
+  const status = (err && err.status) ? err.status : 500;
+  const code = (err && err.code) ? err.code : 'internal_error';
+  const message = (err && err.message) ? err.message : 'Internal server error';
+  // Avoid leaking sensitive details in production
+  const payload = { success: false, error: code, message };
+  if (process.env.NODE_ENV === 'development' && err && err.details) payload.detail = err.details;
+  return res.status(status).json(payload);
+});

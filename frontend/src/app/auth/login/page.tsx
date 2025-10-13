@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_URL as SHARED_API_URL } from '../../../lib/fetchClient';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -16,23 +17,39 @@ export default function LoginPage() {
     setError('');
     
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
-      
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password
-        })
-      });
+      const API_URL = SHARED_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
-      const data = await response.json();
+      const loginUrl = `${API_URL.replace(/\/+$/,'')}/auth/login`;
+      console.debug('Attempting login fetch to:', loginUrl, { navigatorOnline: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown' });
+
+      let response: Response;
+      try {
+        response = await fetch(loginUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+      } catch (netErr: any) {
+        console.error('Network error during login fetch', netErr);
+        const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
+        throw new Error(`Network error: failed to reach ${loginUrl} (online=${online}). Check backend is running and CORS is configured.`);
+      }
+
+      // Try to parse JSON response safely
+      let data: any = null;
+      try {
+        data = await response.json();
+      } catch (parseErr) {
+        const text = await response.text().catch(() => '');
+        throw new Error(`Invalid server response: ${text || response.statusText}`);
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || data.detail || 'Login failed');
+        const msg = data?.message || data?.detail || data?.error || (data && data.data && (data.data.message || data.data.error)) || 'Login failed';
+        throw new Error(msg);
       }
 
       // Support both response shapes: { token, user } and { success, data: { token, user } }
@@ -73,6 +90,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
+                autoComplete="email"
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter your email"
             />
@@ -88,6 +106,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Enter your password"
             />

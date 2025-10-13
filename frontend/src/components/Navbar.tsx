@@ -23,6 +23,7 @@ export default function Navbar() {
   const [openMobile, setOpenMobile] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState<any>(null);
 
   const isActive = (path: string) =>
     pathname === path || (path !== '/' && pathname?.startsWith(path));
@@ -42,6 +43,14 @@ export default function Navbar() {
     useEffect(() => {
       checkAuth();
 
+      // load user info if present
+      try {
+        const userData = typeof window !== 'undefined' ? localStorage.getItem('user_data') : null;
+        if (userData) setUser(JSON.parse(userData));
+      } catch (e) {
+        setUser(null);
+      }
+
       const onStorage = (e: StorageEvent) => {
         if (e.key === 'auth_token') checkAuth();
       };
@@ -55,38 +64,58 @@ export default function Navbar() {
       checkAuth();
     }, [pathname]);
 
+    // When authentication changes in the same tab (e.g. after login), load user data
+    useEffect(() => {
+      if (isAuthenticated) {
+        try {
+          const userData = typeof window !== 'undefined' ? localStorage.getItem('user_data') : null;
+          if (userData) setUser(JSON.parse(userData));
+        } catch (e) {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+    }, [isAuthenticated]);
+
   if (!isAuthenticated) return null;
 
   return (
     <>
-      <header className="sticky top-0 z-50 backdrop-blur-sm bg-white/80 border-b">
+      <header className="sticky top-0 z-50 backdrop-blur-sm bg-white/80 border-b relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Left - logo + main nav */}
-            <div className="flex items-center gap-6">
+            {/* Left - logo (pin to left edge on md+) */}
+            <div className="flex items-center gap-6 md:absolute md:top-0 md:bottom-0 md:left-4 md:h-16">
               <Link href="/" className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold shadow">
                   AI
                 </div>
                 <div className="hidden sm:block">
                   <div className="text-base font-semibold text-gray-900">AI Dispute Resolver</div>
-                  <div className="text-xs text-gray-500 -mt-0.5">Resolve disputes faster</div>
+                  {/* Replace subtitle with welcome + logout when user is present */}
+                  {user ? (
+                    <div className="flex items-center gap-3 -mt-0.5">
+                      <span className="text-xs text-gray-600">Welcome, {user?.name || 'User'}</span>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500 -mt-0.5">Resolve disputes faster</div>
+                  )}
                 </div>
               </Link>
-
-              {/* Desktop nav */}
-              <nav className="hidden md:flex items-center gap-1">
-                {navItem('/dashboard', <Home className="w-4 h-4" />, 'Dashboard', isActive('/dashboard'))}
-                {navItem('/cases', <FileText className="w-4 h-4" />, 'Cases', isActive('/cases'))}
-                {navItem('/analytics', <BarChart3 className="w-4 h-4" />, 'Analytics', isActive('/analytics'))}
-                {navItem('/ai-assistant', <Sparkles className="w-4 h-4" />, 'AI Assistant', isActive('/ai-assistant'))}
-                {navItem('/workflow', <Settings className="w-4 h-4" />, 'Workflow', isActive('/workflow'))}
-                {navItem('/automation', <Zap className="w-4 h-4" />, 'Automation', isActive('/automation'))}
-              </nav>
             </div>
 
-            {/* Right - actions */}
-            <div className="flex items-center gap-3">
+            {/* Right - actions (nav moved here for right alignment). On md+ we position absolute to the right edge */}
+            <div className="flex items-center gap-3 ml-auto md:ml-0 md:absolute md:top-0 md:bottom-0 md:right-4 md:h-16">
+              {/* Desktop nav (right-aligned) */}
+              <nav className="hidden md:flex items-center gap-1">
+                {navItem('/cases', <FileText className="w-4 h-4" />, 'Cases', isActive('/cases'))}
+                {navItem('/ai-assistant', <Sparkles className="w-4 h-4" />, 'AI Assistant', isActive('/ai-assistant'))}
+                {navItem('/analytics', <BarChart3 className="w-4 h-4" />, 'Analytics', isActive('/analytics'))}                
+                {navItem('/workflow', <Settings className="w-4 h-4" />, 'Workflow', isActive('/workflow'))}
+                {navItem('/automation', <Zap className="w-4 h-4" />, 'Automation', isActive('/automation'))}
+                {navItem('/dashboard', <Home className="w-4 h-4" />, 'Dashboard', isActive('/dashboard'))}
+              </nav>
               {/* notifications */}
               <div className="relative">
                 <NotificationCenter />

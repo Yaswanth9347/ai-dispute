@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from 'next/navigation';
 import {
   User,
   Mail,
@@ -25,6 +26,7 @@ interface UserProfile {
 }
 
 export default function UserProfileEditor() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -41,13 +43,32 @@ export default function UserProfileEditor() {
   }, [status]);
 
   useEffect(() => {
+    // If there's no auth token, send user to login immediately.
+    // This avoids rendering a confusing "Failed to load profile" message
+    // when the real issue is that the user is not authenticated.
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      if (!token) {
+        router.push('/auth/login');
+        return;
+      }
+    } catch (e) {
+      // ignore localStorage errors and try to fetch profile (fetchProfile will handle 401)
+    }
     fetchProfile();
   }, []);
 
   const fetchProfile = async () => {
     try {
-      const token = localStorage.getItem("auth_token");
       const response = await apiFetch("/users/profile");
+      if (response.status === 401) {
+        // Not authenticated — redirect to login so user can sign in
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+          window.location.href = '/auth/login';
+        }
+        return;
+      }
       if (response.ok) {
         const data = await response.json();
         setProfile(data.data);

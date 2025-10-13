@@ -1,49 +1,4 @@
 {
-  "2f4393f3-c16c-4991-a8fd-6590213b85ec": {
-    "history": [
-      {
-        "role": "user",
-        "content": "vghbdjmk",
-        "timestamp": "2025-10-11T17:27:57.030Z"
-      },
-      {
-        "role": "assistant",
-        "content": "I'm sorry, I didn't understand your request. Could you please clarify what you need help with? For example, are you looking for information on a specific legal topic, do you have a question about a legal document, or are you involved in a legal dispute?\n\nTo help me understand your needs better, please tell me:\n\n*   **What is the legal issue you are facing?** (e.g., contract dispute, personal injury, employment issue, etc.)\n*   **What is your role in the situation?** (e.g., plaintiff, defendant, witness, etc.)\n*   **What specific questions do you have?**\n\nOnce I have this information, I can provide you with more relevant and helpful information.\n",
-        "timestamp": "2025-10-11T17:27:57.030Z"
-      },
-      {
-        "role": "user",
-        "content": "vygbuhdsmk",
-        "timestamp": "2025-10-11T17:27:59.943Z"
-      },
-      {
-        "role": "assistant",
-        "content": "I apologize, but I'm still experiencing technical difficulties and am unable to process your request at this time. The network error persists.\n\n**Suggested Next Steps:**\n\n1.  **Troubleshooting:** If you are running a local backend server, please ensure it is running correctly and accessible. Check the browser console for any error messages related to CORS (Cross-Origin Resource Sharing) or network connectivity.\n2.  **Alternative Access:** If possible, try accessing this AI Legal Assistant from a different network or device to rule out network-specific issues.\n3.  **Retry Later:** Please try your request again later. The issue might be temporary.\n\nOnce the technical issue is resolved, I will be happy to assist you.\n",
-        "timestamp": "2025-10-11T17:27:59.943Z"
-      },
-      {
-        "role": "user",
-        "content": "bshdnkmk",
-        "timestamp": "2025-10-11T17:28:04.207Z"
-      },
-      {
-        "role": "assistant",
-        "content": "It seems like I'm having trouble connecting to the necessary resources to fully assist you. My apologies!\n\nSince I can't access the backend, I can still offer some general legal information, but it will be limited. To help me provide the *most* relevant information, could you tell me:\n\n1.  **What area of law are you interested in?** (e.g., contract law, family law, criminal law, etc.)\n2.  **What is your general legal question or issue?** (Even a brief summary will help.)\n\nOnce I have a better understanding of your needs, I can try to provide some helpful information or suggest resources you can consult.\n\n**In the meantime, here are some general next steps you can take:**\n\n*   **Check your internet connection:** Make sure you are connected to the internet.\n*   **Consult a legal professional:** The best way to get accurate and personalized legal advice is to speak with a qualified attorney in your jurisdiction. You can find lawyers through your local bar association or online legal directories.\n*   **Research online:** Many reputable websites offer general legal information. Some good starting points include government websites, law school websites, and legal aid organizations. However, remember that online information is not a substitute for legal advice.\n\nI look forward to hearing from you so I can provide more targeted assistance!\n",
-        "timestamp": "2025-10-11T17:28:04.207Z"
-      },
-      {
-        "role": "user",
-        "content": "hey what is article 420",
-        "timestamp": "2025-10-11T17:31:45.502Z"
-      },
-      {
-        "role": "assistant",
-        "content": "Okay, you're asking about \"Article 420.\" Generally, \"Article 420\" is a reference to **cheating** or **fraud** under Indian law, specifically the Indian Penal Code (IPC).\n\n**In short, Article 420 of the Indian Penal Code deals with cheating and dishonestly inducing delivery of property.**\n\n**Here's a breakdown:**\n\n*   **What it covers:** This section punishes anyone who cheats and thereby dishonestly induces the person deceived to deliver any property to any person, or to make, alter, or destroy the whole or any part of a valuable security, or anything which is signed or sealed, and which is capable of being converted into a valuable security.\n\n*   **Punishment:** The punishment for this offense can be imprisonment for a term which may extend to seven years, and a fine.\n\n**Suggested Next Steps:**\n\n1.  **Verify Jurisdiction:** Laws vary significantly by jurisdiction. This information is specific to India. If you are in a different country, the legal code and the specific article number will be different.\n\n2.  **Consult a Lawyer (Important):** If you are facing accusations or have been a victim of fraud, it is *crucial* to consult with a lawyer who specializes in criminal law in the relevant jurisdiction. They can advise you on your rights and options.\n\n3.  **Review the Indian Penal Code (IPC):** You can find the full text of the IPC online. Search for \"Indian Penal Code\" to find a reliable source.\n\n**Clarifying Question:**\n\n*   Are you asking about Article 420 in the context of Indian law, or are you interested in a similar law in a different jurisdiction? Knowing this will help me provide more relevant information.\n",
-        "timestamp": "2025-10-11T17:31:45.502Z"
-      }
-    ],
-    "language": "English"
-  },
   "3b112cce-027e-449b-a31f-6bb884869dd8": {
     "history": [
       {

@@ -48,6 +48,14 @@ const loginSchema = z.object({
 // body: { user_id: "<uuid>" }  OR { email: "user@example.com" } OR { email, password }
 router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (req, res) => {
   const { user_id, email, password } = req.body;
+  // Mask password for logs but provide visibility into incoming login attempts
+  try {
+    const masked = Object.assign({}, req.body);
+    if (masked.password) masked.password = '***';
+    console.debug('auth/login request body:', masked);
+  } catch (logErr) {
+    console.debug('auth/login request body logging failed');
+  }
   if (!user_id && !email) throw new HttpError(400, 'missing_params', 'user_id or email required');
 
   // If email+password provided, try Supabase auth signInWithPassword when available
@@ -323,16 +331,29 @@ router.post('/dev-seed', asyncHandler(async (req, res) => {
   if (process.env.NODE_ENV === 'production') return res.status(403).json({ success: false, message: 'not_allowed' });
   const { email = 'dev@example.com', name = 'Dev User' } = req.body || {};
   try {
-    const { data, error } = await supabase.from('users').insert([{ email, name }], { upsert: true }).select('id, email, name').maybeSingle();
-    if (error) {
-      console.warn('dev-seed insert error', error);
-      return res.status(500).json({ success: false, message: 'failed_seed', detail: error });
+    // Try to find existing user by email first
+    const { data: existing, error: fetchErr } = await supabase.from('users').select('id,email,name').eq('email', email).limit(1).maybeSingle();
+    if (fetchErr) {
+      console.warn('dev-seed fetch error', fetchErr);
+      return res.status(500).json({ success: false, message: 'failed_seed', detail: fetchErr });
     }
-    const id = data?.id || `dev-${Date.now()}`;
-    const now = Math.floor(Date.now() / 1000);
-    const payload = { sub: id, email: data?.email || email, name: data?.name || name, iat: now };
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
-    return res.json({ success: true, data: { token, user: { id, email: data?.email || email, name: data?.name || name } } });
+    let userRow = existing;
+    if (!userRow) {
+      // Insert with a generated uuid to satisfy NOT NULL id constraints
+      const { v4: uuidv4 } = require('uuid');
+      const newId = uuidv4();
+      const { data: inserted, error: insertErr } = await supabase.from('users').insert([{ id: newId, email, name }]).select('id,email,name').maybeSingle();
+      if (insertErr) {
+        console.warn('dev-seed insert error', insertErr);
+        return res.status(500).json({ success: false, message: 'failed_seed', detail: insertErr });
+      }
+      userRow = inserted;
+    }
+  const id = userRow?.id || `dev-${Date.now()}`;
+  const now = Math.floor(Date.now() / 1000);
+  const payload = { sub: id, email: userRow?.email || email, name: userRow?.name || name, iat: now };
+  const token = jwt.sign(payload, JWT_SECRET, { expiresIn: TOKEN_EXPIRATION });
+  return res.json({ success: true, data: { token, user: { id, email: userRow?.email || email, name: userRow?.name || name } } });
   } catch (e) {
     console.error('dev-seed err', e);
     return res.status(500).json({ success: false, message: 'seed_failed', detail: e.message });

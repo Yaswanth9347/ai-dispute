@@ -28,8 +28,30 @@
     "phone": "",
     "organization": "",
     "role": "user",
-    "avatar": "",
+    "avatar": "http://localhost:8081/uploads/1760233891191-185464639.jpg",
     "bio": "",
     "createdAt": "2025-10-11T17:40:31.899Z"
+  },
+  "806923a4-fe17-40c3-8b3e-b6c6ac3ece38": {
+    "id": "806923a4-fe17-40c3-8b3e-b6c6ac3ece38",
+    "name": "sankar",
+    "email": "sankaryerra677@gmail.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "",
+    "bio": "",
+    "createdAt": "2025-10-12T01:55:17.341Z"
+  },
+  "bd6db0a7-2be3-4fb4-83b5-28a61ed0fbc7": {
+    "id": "bd6db0a7-2be3-4fb4-83b5-28a61ed0fbc7",
+    "name": "Dev User",
+    "email": "dev@example.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "",
+    "bio": "",
+    "createdAt": "2025-10-13T05:07:24.919Z"
   }
 }
