@@ -6,7 +6,7 @@
     "phone": "",
     "organization": "",
     "role": "user",
-    "avatar": "http://localhost:8080/uploads/1759945714377-789042964.png",
+    "avatar": "http://localhost:8081/uploads/1760363936101-275711290.png",
     "bio": "",
     "createdAt": "2025-10-08T14:53:46.985Z"
   },
@@ -53,5 +53,16 @@
     "avatar": "",
     "bio": "",
     "createdAt": "2025-10-13T05:07:24.919Z"
+  },
+  "f2044b9a-30fb-4287-a2b7-de6e726de0a4": {
+    "id": "f2044b9a-30fb-4287-a2b7-de6e726de0a4",
+    "name": "User",
+    "email": "themastercoming996@gmail.com",
+    "phone": "",
+    "organization": "",
+    "role": "user",
+    "avatar": "http://localhost:8080/uploads/1760531811697-266050749.jpeg",
+    "bio": "",
+    "createdAt": "2025-10-15T12:36:43.679Z"
   }
 }

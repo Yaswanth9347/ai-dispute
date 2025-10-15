@@ -1,7 +1,7 @@
 {
-  "/profile/page": "app/profile/page.js",
-  "/workflow/page": "app/workflow/page.js",
-  "/automation/page": "app/automation/page.js",
+  "/page": "app/page.js",
   "/cases/page": "app/cases/page.js",
-  "/cases/[id]/page": "app/cases/[id]/page.js"
+  "/cases/[id]/page": "app/cases/[id]/page.js",
+  "/profile/page": "app/profile/page.js",
+  "/auth/login/page": "app/auth/login/page.js"
 }

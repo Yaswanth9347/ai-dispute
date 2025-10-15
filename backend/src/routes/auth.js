@@ -36,6 +36,7 @@ const registerSchema = z.object({
   name: z.string().min(1).optional(),
   phone_number: z.string().optional(),
   district_pin: z.string().optional(),
+  case_ref: z.string().optional(), // Case reference number for defendant signup
 });
 
 const loginSchema = z.object({
@@ -140,9 +141,9 @@ router.post('/login', validate.zod({ body: loginSchema }), asyncHandler(async (r
 }));
 
 // Register endpoint: POST /api/auth/register
-// body: { email: "<string>", password: "<string>", name?: "<string>" }
+// body: { email: "<string>", password: "<string>", name?: "<string>", case_ref?: "<string>" }
 router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(async (req, res) => {
-  const { email, password, name } = req.body;
+  const { email, password, name, case_ref } = req.body;
   const { phone_number, district_pin } = req.body;
 
   // If Supabase auth admin is available, create a user there (requires service role key)
@@ -179,6 +180,64 @@ router.post('/register', validate.zod({ body: registerSchema }), asyncHandler(as
         await supabase.from('users').insert([profile]);
       } catch (profileErr) {
         console.warn('failed to insert profile row after auth create', profileErr);
+      }
+
+      // If case_ref provided, link user to case as defendant
+      if (case_ref) {
+        try {
+          const CaseEmailService = require('../services/CaseEmailService');
+          const CaseNotification = require('../models/CaseNotification');
+          const { calculateSubmissionDeadline } = require('../lib/caseReferenceGenerator');
+
+          // Find case by reference number
+          const { data: caseData, error: caseErr } = await supabase
+            .from('cases')
+            .select('*, users!filed_by(name, email)')
+            .eq('case_reference_number', case_ref)
+            .single();
+
+          if (!caseErr && caseData && caseData.other_party_email === email) {
+            // Update case with defendant user ID and new status
+            const submissionDeadline = calculateSubmissionDeadline();
+            await supabase
+              .from('cases')
+              .update({
+                defendant_user_id: createdUser.id,
+                status: 'ACTIVE',
+                submission_deadline: submissionDeadline.toISOString()
+              })
+              .eq('id', caseData.id);
+
+            // Add timeline event
+            await supabase.from('case_timeline').insert({
+              case_id: caseData.id,
+              event_type: 'defendant_joined',
+              event_title: 'Defendant Joined Case',
+              event_description: `${name || email} created an account and joined the case`,
+              actor_id: createdUser.id,
+              is_public: true,
+              metadata: {
+                submission_deadline: submissionDeadline.toISOString()
+              }
+            });
+
+            // Send notification to plaintiff (async)
+            CaseEmailService.sendDefendantJoinedNotification({
+              caseReferenceNumber: caseData.case_reference_number,
+              caseTitle: caseData.title,
+              plaintiffName: caseData.users?.name || 'Plaintiff',
+              plaintiffEmail: caseData.users?.email,
+              defendantName: name || email
+            }).catch(err => console.error('Failed to send defendant joined notification:', err));
+
+            console.log(`✅ User ${createdUser.id} linked to case ${case_ref}`);
+          } else {
+            console.warn(`⚠️  Case ${case_ref} not found or email mismatch for user ${email}`);
+          }
+        } catch (caseLinkErr) {
+          console.error('Failed to link user to case:', caseLinkErr);
+          // Don't fail registration if case linking fails
+        }
       }
 
       // Optionally auto-login in development to bypass email confirmation

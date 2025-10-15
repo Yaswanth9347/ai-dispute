@@ -1,6 +1,7 @@
 // Services Index - Export implemented business logic services
 const CaseService = require('./CaseService');
 const TimelineService = require('./TimelineService');
+const CaseStatusService = require('./CaseStatusService');
 
 // Phase 2 AI Services - IMPLEMENTED
 const GeminiService = require('./GeminiService');
@@ -17,6 +18,7 @@ const AIAnalysisService = require('./AIAnalysisService');
 module.exports = {
   CaseService,
   TimelineService,
+  CaseStatusService,
   // Phase 2 AI Services
   GeminiService,
   AIAnalysisService

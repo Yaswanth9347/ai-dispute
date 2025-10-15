@@ -14,6 +14,9 @@ try { promClient = require('prom-client'); } catch (e) { promClient = null; }
 
 const app = express();
 
+// Set trust proxy for rate limiting to work correctly with X-Forwarded-For
+app.set('trust proxy', true);
+
 // Ensure uploads directory exists on startup
 const fs = require('fs');
 const uploadsDir = require('path').join(__dirname, 'uploads');

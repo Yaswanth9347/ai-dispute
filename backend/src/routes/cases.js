@@ -7,21 +7,103 @@ const fs = require('fs');
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const { enqueueEvidence } = require('../lib/mediaWorker');
+const CaseModel = require('../models/Case');
+const CaseEmailService = require('../services/CaseEmailService');
+const CaseNotification = require('../models/CaseNotification');
 
 // 1) create case
 router.post('/', async (req, res) => {
-  const { title, filed_by, case_type, jurisdiction } = req.body;
-  if (!title || !filed_by) return res.status(400).json({ error: 'missing' });
+  const { 
+    title, 
+    filed_by, 
+    case_type, 
+    jurisdiction,
+    description,
+    dispute_amount,
+    other_party_name,
+    other_party_email,
+    other_party_phone,
+    other_party_address,
+    currency,
+    priority,
+    mediation_required
+  } = req.body;
+
+  if (!title || !filed_by) {
+    return res.status(400).json({ error: 'Title and filed_by are required' });
+  }
+
+  if (!other_party_email) {
+    return res.status(400).json({ error: 'Other party email is required for notifications' });
+  }
 
   try {
-    const { data, error } = await supabase
-      .from('cases')
-      .insert([{ title, filed_by, case_type, jurisdiction }])
-      .select()
+    // Use Case model to create case with reference number and deadlines
+    const caseData = {
+      title,
+      case_type,
+      jurisdiction: jurisdiction || 'Default',
+      description,
+      dispute_amount,
+      other_party_name,
+      other_party_email,
+      other_party_phone,
+      other_party_address,
+      currency: currency || 'INR',
+      priority: priority || 'normal',
+      mediation_required: mediation_required || false
+    };
+
+    const newCase = await CaseModel.createCase(caseData, filed_by);
+
+    // Get plaintiff information for the email
+    const { data: plaintiffData } = await supabase
+      .from('users')
+      .select('name, email')
+      .eq('id', filed_by)
       .single();
 
-    if (error) return res.status(500).json({ error });
-    return res.json(data);
+    // Send case filed notification to defendant (async, non-blocking)
+    try {
+      // Create notification record (CaseNotification is already an instance)
+      const notification = await CaseNotification.createNotification({
+        case_id: newCase.id,
+        recipient_email: other_party_email,
+        recipient_name: other_party_name,
+        notification_type: 'case_filed',
+        subject: `⚖️ Legal Notice: Case ${newCase.case_reference_number} Filed Against You`,
+        status: 'pending'
+      });
+
+      // Send email (don't wait for it)
+      CaseEmailService.sendCaseFiledNotification({
+        caseId: newCase.id,
+        caseReferenceNumber: newCase.case_reference_number,
+        caseTitle: title,
+        plaintiffName: plaintiffData?.name || 'Plaintiff',
+        defendantName: other_party_name,
+        defendantEmail: other_party_email,
+        responseDeadline: newCase.response_deadline
+      })
+      .then(result => {
+        // Update notification status
+        CaseNotification.updateStatus(
+          notification.id, 
+          result.success ? 'sent' : 'failed',
+          result.error || null
+        );
+        console.log('✅ Case filed notification sent:', newCase.case_reference_number);
+      })
+      .catch(err => {
+        console.error('❌ Failed to send case filed notification:', err);
+        CaseNotification.updateStatus(notification.id, 'failed', err.message);
+      });
+    } catch (emailErr) {
+      console.error('⚠️  Email notification setup failed:', emailErr);
+      // Don't fail the case creation if email fails
+    }
+
+    return res.json(newCase);
   } catch (err) {
     console.error('[cases] create error', err);
     return res.status(500).json({ error: err.message || err });
@@ -31,8 +113,36 @@ router.post('/', async (req, res) => {
 // 0) list cases (GET /)
 router.get('/', async (req, res) => {
   try {
-    const { data, error } = await supabase.from('cases').select('*').order('created_at', { ascending: false });
-    if (error) return res.status(500).json({ error });
+    // Use direct query with service role to bypass RLS
+    const { data, error } = await supabase
+      .rpc('get_all_cases_admin');
+    
+    // If RPC doesn't exist, fall back to simple query
+    // Supabase PostgREST returns 'PGRST202' for missing functions
+    if (error && (error.code === '42883' || error.code === 'PGRST202')) {
+      // Function doesn't exist, use simple select
+      const result = await supabase
+        .from('cases')
+        .select('id, title, case_type, status, dispute_amount, created_at, case_reference_number, filed_by, other_party_name, other_party_email')
+        .order('created_at', { ascending: false });
+      
+      if (result.error) {
+        console.error('[cases] list error:', result.error);
+        // If still RLS error, return empty array instead of failing
+        if (result.error.code === '42P17') {
+          console.warn('[cases] RLS policy has infinite recursion - returning empty array');
+          return res.json([]);
+        }
+        return res.status(500).json({ error: result.error.message });
+      }
+      return res.json(result.data || []);
+    }
+    
+    if (error) {
+      console.error('[cases] list error:', error);
+      return res.status(500).json({ error: error.message });
+    }
+    
     return res.json(data || []);
   } catch (err) {
     console.error('[cases] list error', err);
@@ -139,6 +249,125 @@ router.get('/:id/timeline', async (req, res) => {
   } catch (err) {
     console.error('[cases] timeline error', err);
     return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// Get single case by ID with all details
+router.get('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Use CaseModel directly (it's already an instance)
+    const caseData = await CaseModel.getCaseWithDetails(id, null);
+
+    if (!caseData) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    res.json(caseData);
+  } catch (err) {
+    console.error('[cases] get by id error', err);
+    return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// Update case status with workflow validation
+router.patch('/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, reason } = req.body;
+    const filed_by = req.body.filed_by || req.user?.id;
+
+    if (!status) {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    if (!filed_by) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const CaseStatusService = require('../services/CaseStatusService');
+
+    // Update status with validation
+    const result = await CaseStatusService.updateCaseStatus(
+      id,
+      status,
+      filed_by,
+      reason || `Status updated to ${status}`,
+      {}
+    );
+
+    // Get updated case data
+    const updatedCase = await CaseModel.getCaseWithDetails(id, null);
+
+    res.json({
+      success: true,
+      message: `Case status updated to ${status}`,
+      case: updatedCase,
+      transition: result
+    });
+  } catch (err) {
+    console.error('[cases] status update error', err);
+    
+    // Check if it's a validation error
+    if (err.message.includes('Cannot transition') || err.message.includes('Invalid')) {
+      return res.status(400).json({ error: err.message });
+    }
+    
+    return res.status(500).json({ error: err.message || 'Failed to update status' });
+  }
+});
+
+// Get case timeline
+router.get('/:id/timeline', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const TimelineService = require('../services/TimelineService');
+    
+    const timeline = await TimelineService.getCaseTimeline(id, true);
+    
+    res.json({
+      success: true,
+      timeline: timeline || []
+    });
+  } catch (err) {
+    console.error('[cases] timeline error', err);
+    return res.status(500).json({ error: err.message || 'Failed to get timeline' });
+  }
+});
+
+// Get workflow information for a case
+router.get('/:id/workflow', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const CaseStatusService = require('../services/CaseStatusService');
+    
+    // Get case
+    const caseData = await CaseModel.findById(id);
+    if (!caseData) {
+      return res.status(404).json({ error: 'Case not found' });
+    }
+
+    const currentStatus = caseData.status || 'draft';
+    const statusInfo = CaseStatusService.getStatusInfo(currentStatus);
+    const allowedTransitions = CaseStatusService.getAllowedNextStatuses(currentStatus);
+    
+    res.json({
+      success: true,
+      current_status: currentStatus,
+      status_info: statusInfo,
+      allowed_transitions: allowedTransitions.map(status => ({
+        status,
+        info: CaseStatusService.getStatusInfo(status)
+      })),
+      all_statuses: Object.keys(CaseStatusService.TRANSITIONS).map(status => ({
+        status,
+        info: CaseStatusService.getStatusInfo(status)
+      }))
+    });
+  } catch (err) {
+    console.error('[cases] workflow error', err);
+    return res.status(500).json({ error: err.message || 'Failed to get workflow info' });
   }
 });
 

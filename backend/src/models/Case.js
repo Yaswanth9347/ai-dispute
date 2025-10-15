@@ -14,6 +14,11 @@ class Case extends BaseModel {
         throw new Error('Case title and filed_by are required');
       }
 
+      // Generate case reference number and calculate deadlines
+      const { generateCaseReferenceNumber, calculateResponseDeadline } = require('../lib/caseReferenceGenerator');
+      const caseReferenceNumber = await generateCaseReferenceNumber();
+      const responseDeadline = calculateResponseDeadline();
+
       // Create the case
       const caseRecord = await this.create({
         title: caseData.title,
@@ -22,7 +27,7 @@ class Case extends BaseModel {
         case_type: caseData.case_type,
         jurisdiction: caseData.jurisdiction,
         dispute_amount: caseData.dispute_amount,
-        currency: caseData.currency || 'USD',
+        currency: caseData.currency || 'INR',
         priority: caseData.priority || 'normal',
         deadline: caseData.deadline,
         category_id: caseData.category_id,
@@ -30,17 +35,30 @@ class Case extends BaseModel {
         mediation_required: caseData.mediation_required || false,
         metadata: caseData.metadata || {},
         is_public: caseData.is_public || false,
-        status: 'draft'
+        status: 'PENDING_RESPONSE',
+        case_reference_number: caseReferenceNumber,
+        response_deadline: responseDeadline.toISOString(),
+        submission_deadline: null,
+        other_party_name: caseData.other_party_name,
+        other_party_email: caseData.other_party_email,
+        other_party_phone: caseData.other_party_phone,
+        other_party_address: caseData.other_party_address,
+        defendant_user_id: null,
+        filed_date: new Date().toISOString()
       });
 
       // Create initial timeline entry
       await this.supabase.from('case_timeline').insert({
         case_id: caseRecord.id,
-        event_type: 'case_created',
+        event_type: 'case_filed',
         event_title: 'Case Filed',
-        event_description: `New case "${caseData.title}" has been filed`,
+        event_description: `Case "${caseData.title}" (${caseReferenceNumber}) filed against ${caseData.other_party_name || 'defendant'}`,
         actor_id: filedBy,
-        is_public: true
+        is_public: true,
+        metadata: {
+          case_reference: caseReferenceNumber,
+          response_deadline: responseDeadline.toISOString()
+        }
       });
 
       return caseRecord;
@@ -161,13 +179,35 @@ class Case extends BaseModel {
   // Update case status
   async updateStatus(caseId, newStatus, userId, reason = '') {
     try {
-      const validStatuses = ['draft', 'open', 'analyzing', 'closed', 'escalated'];
+      const validStatuses = [
+        'draft',
+        'PENDING_RESPONSE',
+        'ESCALATED',
+        'ACTIVE',
+        'SUBMISSION_PHASE',
+        'AI_ANALYZING',
+        'AWAITING_ADDITIONAL_EVIDENCE',
+        'FINAL_ANALYSIS',
+        'OPTION_SELECTION',
+        'SAME_OPTION',
+        'DIFFERENT_OPTIONS',
+        'RE_ANALYZING',
+        'PROMISSORY_NOTE_PREP',
+        'SIGNATURE_PENDING',
+        'RESOLVED',
+        'UNRESOLVED',
+        'COURT_FORWARDED',
+        'open',
+        'analyzing',
+        'closed',
+        'escalated'
+      ];
       if (!validStatuses.includes(newStatus)) {
         throw new Error('Invalid case status');
       }
 
       const updates = { status: newStatus };
-      if (newStatus === 'closed') {
+      if (newStatus === 'closed' || newStatus === 'RESOLVED') {
         updates.closed_at = new Date().toISOString();
         updates.closed_by = userId;
       }
