@@ -35,8 +35,8 @@ export default function AIAssistantButton() {
       />
       
       {/* Modal */}
-      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 sm:p-6 pointer-events-none overflow-y-auto">
-        <div className="w-full max-w-4xl my-auto pointer-events-auto">
+      <div className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-4 pointer-events-none overflow-y-auto">
+        <div className="w-full max-w-6xl my-auto pointer-events-auto">
           {/* Close Button */}
           <div className="flex justify-end mb-2">
             <button
@@ -49,7 +49,7 @@ export default function AIAssistantButton() {
           </div>
           
           {/* AI Chat Component */}
-          <div className="max-h-[calc(100vh-4rem)]">
+          <div className="h-[calc(100vh-6rem)]">
             <AIChatAssistant />
           </div>
         </div>

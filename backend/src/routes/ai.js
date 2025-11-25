@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const AIController = require('../controllers/AIController');
+const AIConversationController = require('../controllers/AIConversationController');
 const { requireAuth } = require('../lib/authMiddleware');
 const { body, param } = require('express-validator');
 const validate = require('../middleware/validate');
@@ -350,6 +351,95 @@ router.post('/reanalyze/:analysisId',
  *         description: AI service is degraded or unavailable
  */
 router.get('/health', AIController.healthCheck);
+
+// ========== AI Conversation & File Upload Routes ==========
+
+/**
+ * @swagger
+ * /api/ai/conversation-history/{caseId}:
+ *   get:
+ *     summary: Get AI conversation history for a case
+ *     description: Retrieve all chat messages between user and AI for a specific case
+ *     tags: [AI Conversation]
+ *     parameters:
+ *       - in: path
+ *         name: caseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Conversation history retrieved successfully
+ */
+router.get('/conversation-history/:caseId', AIConversationController.getConversationHistory);
+
+/**
+ * @swagger
+ * /api/ai/conversation-history:
+ *   post:
+ *     summary: Save a conversation message
+ *     description: Save a user or assistant message to the conversation history
+ *     tags: [AI Conversation]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - caseId
+ *               - message
+ *               - role
+ *             properties:
+ *               caseId:
+ *                 type: string
+ *                 format: uuid
+ *               message:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [user, assistant]
+ *               attachments:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *     responses:
+ *       201:
+ *         description: Message saved successfully
+ */
+router.post('/conversation-history', AIConversationController.saveConversationMessage);
+
+/**
+ * @swagger
+ * /api/ai/upload-files:
+ *   post:
+ *     summary: Upload and analyze files
+ *     description: Upload PDF, images, or documents and get AI analysis of content
+ *     tags: [AI Conversation]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               files:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: binary
+ *               caseId:
+ *                 type: string
+ *                 format: uuid
+ *     responses:
+ *       200:
+ *         description: Files uploaded and analyzed successfully
+ */
+router.post('/upload-files', 
+  AIConversationController.upload.array('files', 5), 
+  AIConversationController.uploadFiles
+);
 
 // Export router
 module.exports = router;

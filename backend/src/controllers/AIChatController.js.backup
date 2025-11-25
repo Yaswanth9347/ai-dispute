@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const { requireAuth } = require('../lib/authMiddleware');
-const { generateLegalResponses } = require('../lib/legalResponseTemplates');
 
 // Simple in-memory conversation store for dev/testing.
 // Maps userId -> Array<{ role: 'user'|'assistant', content: string, timestamp: string }>
@@ -212,41 +211,28 @@ Response guidelines:
 - Provide practical next steps the user can take
 - If unclear, ask for case-specific details rather than giving generic advice`;
 
-    // Get concise legal responses from template helper
-    const responses = generateLegalResponses(message, conversationHistory);
-
-    // Improved keyword matching with priority and context awareness
-    const keywords = {
-      constitution: ['constitution', 'article', 'fundamental right', 'constitutional'],
-      rights: ['right', 'what can i do', 'my rights', 'entitled', 'legal rights'],
-      settlement: ['settlement', 'settle', 'mediation', 'lok adalat', 'compromise', 'negotiation'],
-      analysis: ['analyze', 'analyz', 'strength', 'weakness', 'review', 'assess'],
-      procedure: ['file', 'filing', 'court', 'process', 'procedure', 'how to', 'steps'],
+    // Enhanced responses with Indian legal context
+    const responses = {
+      "constitution": `📜 **Constitutional Analysis of Your Dispute**\n\nUnder the Constitution of India:\n\n**Fundamental Rights (Articles 12-35):**\n• Article 21: Right to Life and Personal Liberty - Your dispute may invoke constitutional protections\n• Article 19: Freedom of Speech and Expression - Relevant if communication/contract issues exist\n• Article 14: Equality before Law - Ensures fair treatment in dispute resolution\n\n**Legal Remedies:**\n• Constitutional Remedies under Article 32/226 (if fundamental rights violated)\n• Civil remedies under relevant statutes (Consumer Protection Act, Contract Act)\n• Alternative Dispute Resolution (ADR) under Section 89 CPC\n\n**Recommended Approach:**\n1. First attempt settlement/mediation under ADR mechanisms\n2. File consumer complaint if product/service dispute\n3. Civil suit if contractual breach\n4. Constitutional petition only if fundamental rights at stake\n\nWould you like me to analyze which constitutional provision applies to your specific situation?`,
+      
+      "rights": `⚖️ **Your Legal Rights Under Indian Law**\n\nBased on your dispute, you have the following rights:\n\n**Under Consumer Protection Act 2019:**\n• Right to be informed about quality, quantity, price\n• Right to be protected against unfair trade practices\n• Right to seek redressal before Consumer Forum (District/State/National)\n• Right to compensation for deficiency in service/defective goods\n\n**Under Contract Act 1872:**\n• Right to enforce valid contracts (Section 10)\n• Right to compensation for breach (Section 73)\n• Right to rescind contract if induced by fraud/misrepresentation (Section 19)\n\n**Constitutional Rights:**\n• Right to justice under Article 39A\n• Right to legal aid if unable to afford (Legal Services Authorities Act 1987)\n\n**Your Options:**\n1. Demand specific performance of contract\n2. Claim damages for breach\n3. File consumer complaint (simple, fast, no court fee)\n4. Approach civil court if claim exceeds ₹1 crore\n\nWhich specific right would you like me to explain in detail?`,
+      
+      "settlement": `🤝 **Fair Settlement Options Under Indian Law**\n\nConsidering legal principles and practical resolution:\n\n**Option 1: Mediation (Recommended)**\n• File application under Section 89 CPC for court-referred mediation\n• Neutral mediator facilitates discussion\n• Legally binding settlement if both parties agree\n• Average time: 2-3 months\n• Cost: Minimal (₹1,000-5,000)\n\n**Option 2: Lok Adalat (People's Court)**\n• Free legal service for disputes up to ₹20 lakhs\n• Voluntary, speedy resolution\n• Award has force of civil court decree\n• No appeal against Lok Adalat decision\n\n**Option 3: Negotiated Settlement**\n• Direct discussion with opposing party\n• Compensation amount: [Based on your case specifics]\n• Payment terms: Lump sum or installments\n• Include non-monetary terms if needed\n\n**Option 4: Consumer Forum Filing**\n• If product/service dispute\n• No lawyer required (can self-represent)\n• Decision within 3-5 months typically\n\n**Recommended Settlement Framework:**\n1. Establish liability (who is at fault)\n2. Quantify damages (financial + mental agony compensation)\n3. Propose 60-40 or 70-30 compromise\n4. Draft settlement deed on ₹100 stamp paper\n5. Execute before witnesses or get notarized\n\nWhich settlement mechanism would you prefer to explore?`,
+      
+      "analysis": `🔍 **Legal Analysis Under Indian Jurisprudence**\n\n**Case Classification:**\nBased on your description, this appears to be a [Civil/Consumer/Contractual] dispute falling under:\n• Primary Statute: [Consumer Protection Act 2019 / Indian Contract Act 1872]\n• Jurisdiction: [Consumer Forum / Civil Court / Arbitration]\n\n**Legal Strengths:**\n1. **Documentary Evidence**: Written agreements/receipts strengthen your position\n2. **Legal Precedents**: Indian courts consistently uphold [relevant principle]\n3. **Statutory Protection**: Consumer forums favor genuine complainants\n4. **Timeline**: Prompt action indicates seriousness\n\n**Potential Challenges:**\n1. **Burden of Proof**: Under Indian Evidence Act, you must prove your claims (Section 101-102)\n2. **Limitation Period**: Must file within time limits (Consumer Act: 2 years; Contract: 3 years)\n3. **Opponent's Defense**: They may claim [common defenses]\n\n**Constitutional Perspective:**\nArticle 39A (Equal Justice and Free Legal Aid) ensures access to justice. If economically weak, you can seek free legal aid from District Legal Services Authority.\n\n**Recommended Legal Strategy:**\n1. Send legal notice under Section 138 (if cheque bounce) or general notice\n2. Give 15-30 days for response\n3. If no response, file appropriate complaint/suit\n4. Simultaneously explore settlement\n\n**Likely Outcome:**\nBased on similar cases in Indian courts, success probability: [High/Medium] if you have proper documentation.\n\nShall I help draft a legal notice or analyze specific evidence?`,
+      
+      "default": `🇮🇳 **AI Legal Analysis - Indian Law Perspective**\n\nNamaste! I've analyzed your query: "${message}"\n\n**Legal Framework:**\nUnder Indian law, your situation requires examination of:\n• Relevant statutes and their applicability\n• Constitutional provisions protecting your rights\n• Established legal precedents from Indian courts\n• Available dispute resolution mechanisms\n\n**Key Considerations:**\n1. **Legal Basis**: Which law governs your dispute\n2. **Jurisdiction**: Appropriate forum (Consumer Court/Civil Court/Arbitration)\n3. **Time Limits**: Statutory limitation periods\n4. **Evidence**: Documents needed to prove your case\n\n**Your Rights:**\nAs an Indian citizen, you have:\n• Right to access justice (Article 39A, Constitution)\n• Right to fair hearing and due process\n• Right to legal representation (or self-representation)\n• Right to appeal if dissatisfied with decision\n\n**Recommended Actions:**\n1. Gather all documentary evidence (agreements, receipts, communications)\n2. Send legal notice to opposing party (gives them chance to settle)\n3. Consult District Legal Services Authority if you need free legal aid\n4. Choose appropriate forum based on claim amount and nature\n\n**Settlement vs Litigation:**\n• Settlement: Faster (2-4 months), cheaper, preserve relationships\n• Litigation: Formal, longer (1-3 years), binding court order\n\nI recommend attempting settlement first through mediation/Lok Adalat.\n\n${conversationHistory && conversationHistory.length > 2 ? 'Based on our previous discussion, ' : ''}Would you like me to:\na) Analyze specific legal provisions applicable to your case\nb) Suggest settlement terms\nc) Explain the litigation process\nd) Draft a legal notice template\n\nPlease share more case details for specific constitutional/legal analysis.`
     };
 
-    // Check which category best matches (prioritize more specific matches)
-    let matchedCategory = null;
-    let maxMatches = 0;
-
-    for (const [category, words] of Object.entries(keywords)) {
-      const matches = words.filter(word => lowerMessage.includes(word)).length;
-      if (matches > maxMatches) {
-        maxMatches = matches;
-        matchedCategory = category;
-      }
-    }
-
-    // Generate response based on matched category or use smart default
-    if (matchedCategory === 'constitution') {
+    if (lowerMessage.includes('constitution') || lowerMessage.includes('article') || lowerMessage.includes('fundamental right')) {
       responseText = responses.constitution;
-    } else if (matchedCategory === 'rights') {
+    } else if (lowerMessage.includes('right') || lowerMessage.includes('what can i do') || lowerMessage.includes('my rights')) {
       responseText = responses.rights;
-    } else if (matchedCategory === 'settlement') {
+    } else if (lowerMessage.includes('settlement') || lowerMessage.includes('settle') || lowerMessage.includes('option') || lowerMessage.includes('mediation')) {
       responseText = responses.settlement;
-    } else if (matchedCategory === 'analysis' || matchedCategory === 'procedure') {
+    } else if (lowerMessage.includes('analyz') || lowerMessage.includes('strength') || lowerMessage.includes('case') || lowerMessage.includes('situation')) {
       responseText = responses.analysis;
     } else {
-      // For general queries, provide contextual response
       responseText = responses.default;
     }
 
