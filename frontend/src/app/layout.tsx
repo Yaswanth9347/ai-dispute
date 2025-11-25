@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { AppQueryProvider } from '@/lib/queryClient'
 import Navbar from '@/components/Navbar'
+import Breadcrumbs from '@/components/navbar/Breadcrumbs'
+import QuickActionsMenu from '@/components/navbar/QuickActionsMenu'
 import ToastContainer from '@/components/notifications/ToastContainer'
 import '@/globals.css'
 
@@ -21,9 +23,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <Navbar />
+        <Breadcrumbs />
         <AppQueryProvider>
           {children}
         </AppQueryProvider>
+        <QuickActionsMenu />
         <ToastContainer />
       </body>
     </html>

@@ -66,12 +66,18 @@ if (isTest) {
   const enhancedCourtRouter = require('./routes/enhancedCourt');
   // Analytics Routes for testing
   const analyticsRouter = require('./routes/analytics');
+  // Dashboard Routes for testing
+  const dashboardRouter = require('./routes/dashboard');
+  // Search Routes for testing
+  const searchRouter = require('./routes/search');
   
   app.use('/api/auth', authRouter);
   app.use('/api/ai/advanced', advancedAIRouter);
   app.use('/api/active-negotiations', activeNegotiationsRouter);
   app.use('/api/enhanced-court', enhancedCourtRouter);
   app.use('/api/analytics', analyticsRouter);
+  app.use('/api/dashboard', dashboardRouter);
+  app.use('/api/search', searchRouter);
 }
 
 if (!isTest) {
@@ -121,6 +127,10 @@ if (!isTest) {
   const aiChatRouter = require('./controllers/AIChatController');
   // Workflow Automation Routes (Phase 3)
   const workflowsRouter = require('./controllers/WorkflowController');
+  // Dashboard Routes
+  const dashboardRouter = require('./routes/dashboard');
+  // Search Routes
+  const searchRouter = require('./routes/search');
 
   app.use('/api/cases', settlementRouter);
   app.use('/api/cases', casesRouter);
@@ -169,6 +179,10 @@ app.use('/uploads', express.static('uploads'));
   app.use('/api/ai', aiChatRouter);
   // Workflow API endpoints (Phase 3)
   app.use('/api/workflows', workflowsRouter);
+  // Dashboard API endpoints
+  app.use('/api/dashboard', dashboardRouter);
+  // Search API endpoints
+  app.use('/api/search', searchRouter);
   // Dispute Resolution Routes (NEW - Complete Workflow)
   const disputesRouter = require('./routes/disputes');
   app.use('/api/disputes', disputesRouter);

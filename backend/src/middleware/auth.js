@@ -21,11 +21,14 @@ const authenticate = async (req, res, next) => {
     try {
       const decoded = jwt.verify(token, JWT_SECRET);
       
+      // Support both sub (new format) and user_id/userId (legacy format)
+      const userId = decoded.sub || decoded.user_id || decoded.userId || decoded.id;
+      
       // Verify user exists
       const { data: user, error } = await supabase
         .from('users')
         .select('*')
-        .eq('id', decoded.user_id || decoded.userId || decoded.id)
+        .eq('id', userId)
         .single();
 
       if (error || !user) {
@@ -71,10 +74,13 @@ const optionalAuth = async (req, res, next) => {
       try {
         const decoded = jwt.verify(token, JWT_SECRET);
         
+        // Support both sub (new format) and user_id/userId (legacy format)
+        const userId = decoded.sub || decoded.user_id || decoded.userId || decoded.id;
+        
         const { data: user } = await supabase
           .from('users')
           .select('*')
-          .eq('id', decoded.user_id || decoded.userId || decoded.id)
+          .eq('id', userId)
           .single();
 
         if (user) {

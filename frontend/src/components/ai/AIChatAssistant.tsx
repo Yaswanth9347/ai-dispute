@@ -154,7 +154,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
   ];
 
   return (
-    <div className="flex flex-col h-[640px] bg-gradient-to-b from-gray-50 via-white to-gray-100 rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+    <div className="flex flex-col h-[700px] max-h-[calc(100vh-5rem)] bg-gradient-to-b from-gray-50 via-white to-gray-100 rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white/70 backdrop-blur-md">
         <div className="relative w-12 h-12">

@@ -318,6 +318,29 @@ router.get('/me', (req, res) => {
   }
 });
 
+// Check if email exists: GET /api/auth/check-email?email=user@example.com
+router.get('/check-email', asyncHandler(async (req, res) => {
+  const { email } = req.query;
+  
+  if (!email) {
+    return res.status(400).json({ success: false, message: 'Email is required' });
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', email)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error('check-email error', error);
+    return res.status(500).json({ success: false, message: 'Failed to check email' });
+  }
+
+  return res.json({ success: true, exists: !!data });
+}));
+
 // Dev-only: create or return a seeded test user and token
 router.post('/dev-seed', asyncHandler(async (req, res) => {
   if (process.env.NODE_ENV === 'production') return res.status(403).json({ success: false, message: 'not_allowed' });

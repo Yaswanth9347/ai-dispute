@@ -2,126 +2,251 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { FileText, Clock, CheckCircle, TrendingUp, Plus, Search, BarChart3, MessageSquare, HelpCircle, LogOut } from 'lucide-react';
+import { StatCard } from '@/components/dashboard/StatCard';
+import { QuickActionButton } from '@/components/dashboard/QuickActionButton';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
 
 // A polished Dashboard page with improved visuals using Tailwind
-// Paste this file into your frontend (e.g. src/app/dashboard/page.tsx)
-
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalCases: 0,
+    activeCases: 0,
+    closedCases: 0,
+    pendingActions: 0,
+  });
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     const token = localStorage.getItem('auth_token');
     const userData = localStorage.getItem('user_data');
-    if (token && userData) setUser(JSON.parse(userData));
+    if (token && userData) {
+      const parsedUser = JSON.parse(userData);
+      setUser(parsedUser);
+      fetchDashboardData(parsedUser.id);
+    }
     setIsLoading(false);
   }, []);
+
+  const fetchDashboardData = async (userId: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+      const token = localStorage.getItem('auth_token');
+      
+      // Fetch dashboard stats
+      const statsResponse = await fetch(`${API_URL}/dashboard/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStats(statsData.data || statsData);
+      }
+
+      // Fetch recent activity
+      const activityResponse = await fetch(`${API_URL}/dashboard/recent-activity`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (activityResponse.ok) {
+        const activityData = await activityResponse.json();
+        setRecentActivity(activityData.data || activityData || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+      // Use demo data
+      setStats({
+        totalCases: 3,
+        activeCases: 2,
+        closedCases: 1,
+        pendingActions: 1,
+      });
+      setRecentActivity([
+        {
+          id: '1',
+          type: 'dispute_created',
+          title: 'New dispute filed',
+          description: 'Property boundary dispute created',
+          timestamp: new Date(Date.now() - 3600000).toISOString(),
+          status: 'pending',
+        },
+        {
+          id: '2',
+          type: 'dispute_updated',
+          title: 'Dispute updated',
+          description: 'AI analysis completed for contract dispute',
+          timestamp: new Date(Date.now() - 7200000).toISOString(),
+          status: 'active',
+        },
+      ]);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token');
     localStorage.removeItem('user_data');
+    localStorage.removeItem('remember_me');
     window.location.href = '/auth/login';
   };
 
-  // Demo data (replace with real API data)
-  const stats = {
-    totalCases: 3,
-    activeCases: 2,
-    closedCases: 1,
-    pendingActions: 1,
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
   };
 
-  const cases = [
-    {
-      id: 'case-1',
-      title: 'Property Boundary Dispute',
-      caseNumber: 'ADR-2024-001',
-      status: 'ai_analysis',
-      createdAt: '2024-10-01',
-      description: 'Dispute regarding property boundary with neighbor',
-    },
-    {
-      id: 'case-2',
-      title: 'Contract Payment Dispute',
-      caseNumber: 'ADR-2024-002',
-      status: 'awaiting_response',
-      createdAt: '2024-10-05',
-      description: 'Non-payment of freelance contract amount',
-    },
-    {
-      id: 'case-3',
-      title: 'Consumer Product Complaint',
-      caseNumber: 'ADR-2024-003',
-      status: 'closed',
-      createdAt: '2024-09-15',
-      description: 'Defective product compensation claim',
-    },
-  ];
-
   if (isLoading) return <LoadingScreen />;
-  if (!user)
-    return (
-      <GuestBanner onLogin={() => (window.location.href = '/auth/login')} />
-    );
+  if (!user) return <GuestBanner onLogin={() => (window.location.href = '/auth/login')} />;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">
+            {getGreeting()}, {user.name}! 👋
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Here's what's happening with your disputes today
+          </p>
+        </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left column - Stats & Quick Actions */}
-        <aside className="lg:col-span-1 space-y-6">
-          <div className="rounded-xl bg-white p-5 shadow-sm border">
-            <h2 className="text-sm font-semibold text-gray-500">Overview</h2>
-            <p className="mt-1 text-xs text-gray-400">Quick snapshot of your work</p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <StatCard
+            title="Total Disputes"
+            value={stats.totalCases}
+            icon={FileText}
+            trend="+12% from last month"
+            trendUp={true}
+          />
+          <StatCard
+            title="Active Disputes"
+            value={stats.activeCases}
+            icon={Clock}
+            trend="-3% from last month"
+            trendUp={false}
+          />
+          <StatCard
+            title="Resolved"
+            value={stats.closedCases}
+            icon={CheckCircle}
+            trend="+8% from last month"
+            trendUp={true}
+          />
+          <StatCard
+            title="Pending Actions"
+            value={stats.pendingActions}
+            icon={TrendingUp}
+            description="Requires your attention"
+          />
+        </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <StatCard label="Total Cases" value={stats.totalCases} icon={'📁'} />
-              <StatCard label="Active" value={stats.activeCases} icon={'⚡'} colorClass="text-blue-600 bg-blue-50" />
-              <StatCard label="Closed" value={stats.closedCases} icon={'✅'} colorClass="text-green-600 bg-green-50" />
-              <StatCard label="Pending" value={stats.pendingActions} icon={'⏳'} colorClass="text-orange-600 bg-orange-50" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Recent Activity - Main Section */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Search Bar */}
+            <div className="bg-white rounded-lg shadow-sm border p-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Search disputes, case numbers, or parties..."
+                />
+              </div>
             </div>
 
-            <div className="mt-6 space-y-2">
-              <ActionButton href="/case/create" label="File New Dispute" emoji={'📝'} />
-              <ActionButton href="/cases" label="Manage Cases" emoji={'📋'} variant="ghost" />
+            {/* Recent Activity */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Recent Activity</h2>
+                <Link href="/activity" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                  View all
+                </Link>
+              </div>
+              <ActivityFeed activities={recentActivity} />
+            </div>
+
+            {/* Quick Stats Chart Placeholder */}
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Dispute Trends</h2>
+              <div className="h-64 flex items-center justify-center bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <div className="text-center">
+                  <BarChart3 className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                  <p className="text-gray-600 font-medium">Analytics Chart</p>
+                  <p className="text-sm text-gray-500 mt-1">Dispute trends visualization coming soon</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="rounded-xl bg-white p-5 shadow-sm border">
-            <h3 className="text-sm font-semibold text-gray-600">Tips</h3>
-            <ul className="mt-3 text-sm text-gray-500 space-y-2">
-              <li>Use AI Analysis for quick summaries.</li>
-              <li>Upload clear PDF evidence for faster processing.</li>
-              <li>Send settlement for e-signature after review.</li>
-            </ul>
-          </div>
-        </aside>
+          {/* Quick Actions Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-lg shadow-sm border p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+              <div className="space-y-3">
+                <QuickActionButton
+                  icon={Plus}
+                  title="File New Dispute"
+                  description="Start a new dispute resolution"
+                  href="/disputes/new"
+                />
+                <QuickActionButton
+                  icon={BarChart3}
+                  title="View Analytics"
+                  description="See detailed reports"
+                  href="/analytics"
+                />
+                <QuickActionButton
+                  icon={MessageSquare}
+                  title="Live Chat Support"
+                  description="Get instant help"
+                  onClick={() => alert('Live chat integration coming soon!')}
+                />
+                <QuickActionButton
+                  icon={HelpCircle}
+                  title="Help Center"
+                  description="Browse documentation"
+                  href="/help"
+                />
+              </div>
+            </div>
 
-        {/* Middle column - Recent Cases (main) */}
-        <section className="lg:col-span-2 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">Recent Cases</h2>
-            <div className="flex items-center gap-3">
-              <input
-                className="px-3 py-2 border rounded-md bg-white text-sm placeholder-gray-400"
-                placeholder="Search cases, numbers or parties"
-              />
-              <Link href="/case/create" className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">New Case</Link>
+            {/* Tips Section */}
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg shadow-sm border border-blue-200 p-6">
+              <h3 className="text-sm font-semibold text-blue-900 mb-3">💡 Tips & Tricks</h3>
+              <ul className="text-sm text-blue-800 space-y-2">
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>Use AI Analysis for quick summaries and insights</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>Upload clear PDF evidence for faster processing</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>Send settlement proposals for e-signature after review</span>
+                </li>
+                <li className="flex items-start">
+                  <span className="mr-2">•</span>
+                  <span>Track all communication in the timeline</span>
+                </li>
+              </ul>
             </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {cases.map((c) => (
-              <CaseCard key={c.id} caseData={c} />
-            ))}
-          </div>
-
-          <div className="rounded-xl bg-white p-6 shadow-sm border">
-            <h3 className="text-lg font-semibold text-gray-800">Activity</h3>
-            <p className="mt-2 text-sm text-gray-500">Recent actions and notifications will appear here.</p>
-            <div className="mt-4 text-sm text-gray-600">No recent activity in demo mode.</div>
-          </div>
-        </section>
+        </div>
       </main>
     </div>
   );
@@ -134,7 +259,7 @@ function LoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
       <div className="text-center">
         <div className="animate-spin h-12 w-12 border-4 border-t-blue-600 border-gray-200 rounded-full mx-auto mb-4"></div>
-        <div className="text-gray-700">Loading dashboard…</div>
+        <div className="text-gray-700 font-medium">Loading dashboard…</div>
       </div>
     </div>
   );
@@ -143,105 +268,23 @@ function LoadingScreen() {
 function GuestBanner({ onLogin }: { onLogin: () => void }) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-gray-50 to-gray-100">
-      <div className="max-w-md bg-white p-8 rounded-xl shadow">
-        <h2 className="text-xl font-semibold">Access Denied</h2>
-        <p className="mt-2 text-sm text-gray-500">Please log in to access the dashboard.</p>
-        <div className="mt-6 flex justify-end">
-          <button onClick={onLogin} className="px-4 py-2 bg-blue-600 text-white rounded-md">Go to Login</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Logo() {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-500 flex items-center justify-center text-white font-bold">AI</div>
-      <div className="hidden sm:block">
-        <div className="text-sm font-semibold text-gray-800">AI Dispute Resolver</div>
-        <div className="text-xs text-gray-400">Resolve disputes faster</div>
-      </div>
-    </div>
-  );
-}
-
-function StatCard({ label, value, icon, colorClass = 'text-gray-700 bg-gray-50' }: any) {
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-md border" role="status">
-      <div className={`flex items-center justify-center rounded-md w-10 h-10 ${colorClass}`}>{icon}</div>
-      <div>
-        <div className="text-xs text-gray-500">{label}</div>
-        <div className="text-lg font-semibold text-gray-800">{value}</div>
-      </div>
-    </div>
-  );
-}
-
-function ActionButton({ href, label, emoji, variant = 'solid' }: any) {
-  const base = 'w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm';
-  if (variant === 'ghost')
-    return (
-      <Link href={href} className={`${base} border border-gray-200 bg-white hover:bg-gray-50`}>
-        <div className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100">{emoji}</div>
-        <div className="text-left">
-          <div className="font-medium text-gray-800">{label}</div>
-        </div>
-      </Link>
-    );
-
-  return (
-    <Link href={href} className={`${base} bg-blue-600 text-white hover:bg-blue-700`}>
-      <div className="w-8 h-8 flex items-center justify-center rounded-full bg-white/20">{emoji}</div>
-      <div className="text-left">
-        <div className="font-medium">{label}</div>
-      </div>
-    </Link>
-  );
-}
-
-function CaseCard({ caseData }: any) {
-  const statusColor = getStatusColor(caseData.status);
-  return (
-    <article className="bg-white p-4 rounded-lg border shadow-sm hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <h3 className="font-semibold text-gray-800">{caseData.title}</h3>
-          <p className="text-xs text-gray-500 mt-1">{caseData.caseNumber} • {caseData.createdAt}</p>
-          <p className="mt-3 text-sm text-gray-600">{caseData.description}</p>
-        </div>
-        <div className="flex-shrink-0 text-right">
-          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusColor}`}>{formatStatus(caseData.status)}</div>
-          <div className="mt-3">
-            <Link href={`/case/${caseData.id}`} className="inline-flex items-center px-3 py-2 rounded-md border text-sm hover:bg-gray-50">View</Link>
+      <div className="max-w-md bg-white p-8 rounded-xl shadow-lg border">
+        <div className="text-center mb-6">
+          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <LogOut className="w-8 h-8 text-red-600" />
           </div>
+          <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
+          <p className="mt-2 text-sm text-gray-600">Please log in to access the dashboard.</p>
+        </div>
+        <div className="flex justify-center">
+          <button 
+            onClick={onLogin} 
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium shadow-sm"
+          >
+            Go to Login
+          </button>
         </div>
       </div>
-    </article>
+    </div>
   );
-}
-
-function getStatusColor(status: string) {
-  switch (status) {
-    case 'filed':
-      return 'bg-blue-100 text-blue-700';
-    case 'awaiting_response':
-      return 'bg-yellow-100 text-yellow-800';
-    case 'under_review':
-      return 'bg-purple-100 text-purple-800';
-    case 'ai_analysis':
-      return 'bg-indigo-100 text-indigo-800';
-    case 'settlement_options':
-      return 'bg-orange-100 text-orange-800';
-    case 'closed':
-      return 'bg-green-100 text-green-800';
-    case 'forwarded_to_court':
-      return 'bg-red-100 text-red-800';
-    default:
-      return 'bg-gray-100 text-gray-700';
-  }
-}
-
-function formatStatus(status: string) {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase());
 }
