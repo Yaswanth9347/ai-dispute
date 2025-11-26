@@ -346,9 +346,9 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 via-white to-gray-100 rounded-3xl shadow-2xl border border-gray-200 overflow-hidden">
+    <div className="flex flex-col h-full bg-white/30 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-200 bg-white/70 backdrop-blur-md">
+      <div className="flex items-center gap-3 px-6 py-4 border-b border-white/30 bg-white/50 backdrop-blur-lg">
         <div className="relative w-12 h-12">
           <div className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 blur-lg opacity-60"></div>
           <div className="relative w-full h-full flex items-center justify-center bg-gradient-to-br from-indigo-600 to-purple-600 rounded-full shadow-lg">
@@ -362,20 +362,53 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scroll-smooth relative">
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4 scroll-smooth relative bg-gradient-to-b from-transparent via-white/20 to-transparent">
         {messages.map((msg) => (
           <div
             key={msg.id}
             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[75%] px-5 py-3 rounded-3xl text-sm shadow transition-all duration-200 whitespace-pre-wrap break-words
+              className={`max-w-[80%] px-5 py-4 rounded-3xl text-sm shadow-lg transition-all duration-200 break-words
                 ${msg.role === 'user'
                   ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-br-none'
-                  : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'}
+                  : 'bg-white/90 backdrop-blur-md border border-white/50 text-gray-900 rounded-bl-none shadow-xl'}
               `}
             >
-              {msg.content}
+              <div className={`leading-relaxed ${msg.role === 'assistant' ? 'space-y-3' : ''}`}>
+                {msg.content.split('\n').map((line, idx) => {
+                  // Handle bold text with **text**
+                  const boldRegex = /\*\*(.+?)\*\*/g;
+                  let parts = [];
+                  let lastIndex = 0;
+                  let match;
+                  
+                  while ((match = boldRegex.exec(line)) !== null) {
+                    if (match.index > lastIndex) {
+                      parts.push(<span key={`text-${idx}-${lastIndex}`}>{line.substring(lastIndex, match.index)}</span>);
+                    }
+                    parts.push(<strong key={`bold-${idx}-${match.index}`} className="font-bold">{match[1]}</strong>);
+                    lastIndex = match.index + match[0].length;
+                  }
+                  
+                  if (lastIndex < line.length) {
+                    parts.push(<span key={`text-${idx}-${lastIndex}`}>{line.substring(lastIndex)}</span>);
+                  }
+                  
+                  if (parts.length === 0) {
+                    parts.push(<span key={`text-${idx}`}>{line}</span>);
+                  }
+                  
+                  // Check if line is a bullet point
+                  const isBullet = line.trim().startsWith('•') || line.trim().startsWith('-');
+                  
+                  return (
+                    <div key={idx} className={isBullet ? 'pl-2' : ''}>
+                      {parts.length > 0 ? parts : line || <br />}
+                    </div>
+                  );
+                })}
+              </div>
               
               {/* File attachments */}
               {msg.attachments && msg.attachments.length > 0 && (
@@ -405,7 +438,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
 
         {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-2xl text-sm text-gray-600 shadow-md animate-pulse">
+            <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md border border-white/50 px-4 py-3 rounded-2xl text-sm text-gray-600 shadow-lg animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
               AI is analyzing your input...
             </div>
@@ -414,7 +447,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
 
         {uploadingFiles && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 bg-white border border-gray-100 px-4 py-2 rounded-2xl text-sm text-gray-600 shadow-md animate-pulse">
+            <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md border border-white/50 px-4 py-3 rounded-2xl text-sm text-gray-600 shadow-lg animate-pulse">
               <Loader2 className="w-4 h-4 animate-spin text-indigo-600" />
               Uploading and analyzing files...
             </div>
@@ -426,7 +459,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
 
       {/* Suggested Questions */}
       {messages.length <= 1 && (
-        <div className="px-5 py-4 border-t border-gray-200 bg-white/70 backdrop-blur-md">
+        <div className="px-5 py-4 border-t border-white/30 bg-white/50 backdrop-blur-lg">
           <p className="text-xs font-semibold text-gray-600 mb-2">Try asking one of these:</p>
           <div className="flex flex-wrap gap-2">
             {suggestedQuestions.map((q) => (
@@ -443,7 +476,7 @@ export default function AIChatAssistant({ caseId }: AIChatAssistantProps) {
       )}
 
       {/* Input Area */}
-      <div className="p-5 border-t border-gray-200 bg-white/70 backdrop-blur-md">
+      <div className="p-5 border-t border-white/30 bg-white/50 backdrop-blur-lg">
         {/* File preview */}
         {selectedFiles.length > 0 && (
           <div className="mb-3 flex flex-wrap gap-2">

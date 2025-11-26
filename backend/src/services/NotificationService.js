@@ -284,20 +284,21 @@ class NotificationService {
     caseId = null 
   } = {}) {
     try {
+      const { supabaseAdmin } = require('../lib/supabaseClient');
+      
       let query = supabaseAdmin
         .from('notifications')
         .select(`
-          notification_id,
-          notification_type,
+          id,
+          type,
           title,
           message,
           priority,
           is_read,
-          action_url,
-          action_data,
+          link_url,
+          metadata,
           created_at,
-          case_id,
-          cases(case_title, case_number)
+          read_at
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -308,15 +309,8 @@ class NotificationService {
       }
 
       if (type) {
-        query = query.eq('notification_type', type);
+        query = query.eq('type', type);
       }
-
-      if (caseId) {
-        query = query.eq('case_id', caseId);
-      }
-
-      // Only show non-expired notifications
-      query = query.or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
 
       const { data: notifications, error } = await query;
 
@@ -342,14 +336,15 @@ class NotificationService {
    */
   async markAsRead(notificationId, userId) {
     try {
-      const { data, error } = await supabaseAdmin
+      const { supabaseAdmin } = require('../lib/supabaseClient');
+      
+      const { data, error} = await supabaseAdmin
         .from('notifications')
         .update({ 
           is_read: true,
-          read_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          read_at: new Date().toISOString()
         })
-        .eq('notification_id', notificationId)
+        .eq('id', notificationId)
         .eq('user_id', userId)
         .select()
         .single();
@@ -373,19 +368,16 @@ class NotificationService {
    */
   async markAllAsRead(userId, caseId = null) {
     try {
+      const { supabaseAdmin } = require('../lib/supabaseClient');
+      
       let query = supabaseAdmin
         .from('notifications')
         .update({ 
           is_read: true,
-          read_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          read_at: new Date().toISOString()
         })
         .eq('user_id', userId)
         .eq('is_read', false);
-
-      if (caseId) {
-        query = query.eq('case_id', caseId);
-      }
 
       const { data, error } = await query.select();
 

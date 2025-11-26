@@ -75,9 +75,9 @@ export default function Navbar() {
       <header className={`sticky top-0 z-50 backdrop-blur-md bg-white/95 border-b transition-shadow duration-200 ${scrolled ? 'shadow-md' : ''}`}>
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 gap-4">
-            {/* Left - logo + main nav */}
-            <div className="flex items-center gap-6 lg:gap-8">
-              <Link href="/dashboard" className="flex items-center gap-3 flex-shrink-0">
+            {/* Left - logo only */}
+            <div className="flex items-center flex-shrink-0">
+              <Link href="/dashboard" className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold shadow-lg">
                   <Sparkles className="w-5 h-5" />
                 </div>
@@ -86,8 +86,11 @@ export default function Navbar() {
                   <div className="text-xs text-gray-500 -mt-0.5">Smart Legal Solutions</div>
                 </div>
               </Link>
+            </div>
 
-              {/* Desktop nav */}
+            {/* Right - nav + search & actions */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              {/* Desktop nav - moved to right */}
               <nav className="hidden lg:flex items-center gap-2">
                 {navItem('/dashboard', <Home className="w-4 h-4" />, 'Dashboard', isActive('/dashboard'))}
                 {navItem('/disputes', <FileText className="w-4 h-4" />, 'Disputes', isActive('/disputes'))}
@@ -95,46 +98,45 @@ export default function Navbar() {
                 {navItem('/analytics', <BarChart3 className="w-4 h-4" />, 'Analytics', isActive('/analytics'))}
                 {navItem('/workflow', <Zap className="w-4 h-4" />, 'Workflow', isActive('/workflow'))}
               </nav>
-            </div>
 
-            {/* Right - search & actions */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              {/* Dispute Search - Only on Disputes page */}
-              {pathname?.startsWith('/disputes') && (
+              <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+                {/* Dispute Search - Only on Disputes page */}
+                {pathname?.startsWith('/disputes') && (
+                  <div className="flex-shrink-0">
+                    <DisputeSearch />
+                  </div>
+                )}
+
+                {/* AI Assistant */}
                 <div className="flex-shrink-0">
-                  <DisputeSearch />
+                  <AIAssistantButton />
                 </div>
-              )}
 
-              {/* AI Assistant */}
-              <div className="flex-shrink-0">
-                <AIAssistantButton />
+                {/* Theme Toggle */}
+                <div className="flex-shrink-0">
+                  <ThemeToggle />
+                </div>
+
+                {/* Notifications */}
+                <div className="flex-shrink-0">
+                  <NotificationCenter />
+                </div>
+
+                {/* User Profile Dropdown */}
+                <div className="flex-shrink-0">
+                  <UserProfileDropdown />
+                </div>
+
+                {/* Mobile menu toggle */}
+                <button
+                  onClick={() => setOpenMobile(!openMobile)}
+                  className="lg:hidden inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
+                  aria-label="Toggle menu"
+                  aria-expanded={openMobile}
+                >
+                  {openMobile ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                </button>
               </div>
-
-              {/* Theme Toggle */}
-              <div className="flex-shrink-0">
-                <ThemeToggle />
-              </div>
-
-              {/* Notifications */}
-              <div className="flex-shrink-0">
-                <NotificationCenter />
-              </div>
-
-              {/* User Profile Dropdown */}
-              <div className="flex-shrink-0">
-                <UserProfileDropdown />
-              </div>
-
-              {/* Mobile menu toggle */}
-              <button
-                onClick={() => setOpenMobile(!openMobile)}
-                className="lg:hidden inline-flex items-center justify-center p-2 rounded-lg hover:bg-gray-100 transition-colors flex-shrink-0"
-                aria-label="Toggle menu"
-                aria-expanded={openMobile}
-              >
-                {openMobile ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-              </button>
             </div>
           </div>
         </div>

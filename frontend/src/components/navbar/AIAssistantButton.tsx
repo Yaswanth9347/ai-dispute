@@ -27,9 +27,9 @@ export default function AIAssistantButton() {
 
   const modalContent = isOpen ? (
     <>
-      {/* Backdrop */}
+      {/* Backdrop - Fully transparent with blur */}
       <div
-        className="fixed inset-0 bg-black/60 z-[9999]"
+        className="fixed inset-0 bg-transparent backdrop-blur-md z-[9999]"
         onClick={() => setIsOpen(false)}
         aria-hidden="true"
       />
@@ -41,7 +41,7 @@ export default function AIAssistantButton() {
           <div className="flex justify-end mb-2">
             <button
               onClick={() => setIsOpen(false)}
-              className="p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-all"
+              className="p-2 rounded-full bg-white/70 backdrop-blur-md hover:bg-white/90 shadow-lg transition-all"
               aria-label="Close AI Assistant"
             >
               <X className="w-5 h-5 text-gray-600" />

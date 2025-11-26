@@ -56,10 +56,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
     const notificationId = req.params.id;
     const userId = req.user.id || req.user.sub;
 
-    const { data, error } = await require('../lib/supabaseClient').supabaseAdmin
+    const { supabaseAdmin } = require('../lib/supabaseClient');
+    const { data, error } = await supabaseAdmin
       .from('notifications')
       .delete()
-      .eq('notification_id', notificationId)
+      .eq('id', notificationId)
       .eq('user_id', userId)
       .select();
 

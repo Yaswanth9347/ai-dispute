@@ -16,6 +16,9 @@ const supabase = createClient(SUPABASE_URL || '', SUPABASE_SERVICE_ROLE_KEY || '
   }
 });
 
+// Create alias for backward compatibility
+const supabaseAdmin = supabase;
+
 async function health() {
   // lightweight health check - adjust table to a small table guaranteed to exist
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
@@ -30,4 +33,4 @@ async function health() {
   }
 }
 
-module.exports = { supabase, health };
+module.exports = { supabase, supabaseAdmin, health };

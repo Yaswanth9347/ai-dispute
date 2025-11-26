@@ -8,7 +8,7 @@ const supabase = (_supabaseModule && _supabaseModule.supabase) ? _supabaseModule
  * @route GET /api/dashboard/stats
  */
 exports.getStats = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user.sub || req.user.id;
 
   // Get case statistics
   const { data: cases, error: casesError } = await supabase
@@ -65,7 +65,7 @@ exports.getStats = asyncHandler(async (req, res) => {
  * @route GET /api/dashboard/recent-activity
  */
 exports.getRecentActivity = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user.sub || req.user.id;
   const limit = parseInt(req.query.limit) || 10;
 
   // Get recent case updates
@@ -103,7 +103,7 @@ exports.getRecentActivity = asyncHandler(async (req, res) => {
  * @route GET /api/dashboard/trends
  */
 exports.getTrends = asyncHandler(async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user.sub || req.user.id;
   const period = req.query.period || 'month'; // month, quarter, year
 
   // Get cases created in the last period
