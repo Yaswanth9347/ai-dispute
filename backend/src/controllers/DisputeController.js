@@ -249,7 +249,7 @@ class DisputeController {
     }
   }
 
-  // Trigger AI analysis and generate settlement options
+  // Trigger AI analysis and generate settlement options (Enhanced with workflow integration)
   async generateSettlementOptions(req, res) {
     try {
       const { caseId } = req.params;
@@ -272,27 +272,44 @@ class DisputeController {
         'Starting AI analysis'
       );
 
-      // Generate settlement options
-      const result = await SettlementOptionService.generateSettlementOptions(caseId, userId);
-
-      if (!result.success) {
+      // Use the enhanced AI workflow integration service
+      const AIWorkflowIntegrationService = require('../services/AIWorkflowIntegrationService');
+      
+      // Trigger AI analysis which will automatically transition to OPTIONS_PRESENTED
+      const analysisResult = await AIWorkflowIntegrationService.triggerAIAnalysis(caseId, userId);
+      
+      if (!analysisResult.success) {
         return res.status(500).json({
           success: false,
-          error: result.error
+          error: analysisResult.error || 'Failed to perform AI analysis'
+        });
+      }
+
+      // Generate settlement options which will transition to AWAITING_SELECTION
+      const optionsResult = await AIWorkflowIntegrationService.generateSettlementOptions(caseId, userId);
+
+      if (!optionsResult.success) {
+        return res.status(500).json({
+          success: false,
+          error: optionsResult.error || 'Failed to generate settlement options'
         });
       }
 
       res.json({
         success: true,
         data: {
-          options: result.options,
-          analysisId: result.analysisId
+          analysis: analysisResult.analysis,
+          analysisId: analysisResult.analysisId,
+          options: optionsResult.options,
+          optionsId: optionsResult.optionsId,
+          activeOptionsId: optionsResult.activeOptionsId,
+          workflowIntegrated: true
         },
-        message: 'AI settlement options generated successfully'
+        message: 'AI analysis and settlement options generated successfully with workflow integration'
       });
 
     } catch (error) {
-      logger.error('Error in generateSettlementOptions:', error);
+      logger.error('Error in generateSettlementOptions (enhanced):', error);
       res.status(500).json({
         success: false,
         error: error.message
@@ -331,7 +348,7 @@ class DisputeController {
     }
   }
 
-  // Select a settlement option
+  // Select a settlement option (Enhanced with workflow integration)
   async selectOption(req, res) {
     try {
       const { caseId } = req.params;
@@ -345,18 +362,37 @@ class DisputeController {
         });
       }
 
-      // Transition to awaiting selection stage if not already
-      const workflowResult = await DisputeWorkflowService.getWorkflow(caseId);
-      if (workflowResult.success && workflowResult.workflow.current_stage === DisputeWorkflowService.DisputeStage.OPTIONS_PRESENTED) {
-        await DisputeWorkflowService.transitionStage(
-          caseId,
-          DisputeWorkflowService.DisputeStage.AWAITING_SELECTION,
-          userId,
-          'Party started selecting options'
-        );
+      // Get case data to determine party type
+      const caseData = await Case.getById(caseId);
+      if (!caseData) {
+        return res.status(404).json({
+          success: false,
+          error: 'Case not found'
+        });
       }
 
-      const result = await SettlementOptionService.selectOption(caseId, userId, optionId, comments);
+      let partyType;
+      if (caseData.filed_by === userId) {
+        partyType = 'complainer';
+      } else if (caseData.defender_id === userId) {
+        partyType = 'defender';
+      } else {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied'
+        });
+      }
+
+      // Use the enhanced AI workflow integration service
+      const AIWorkflowIntegrationService = require('../services/AIWorkflowIntegrationService');
+      
+      const result = await AIWorkflowIntegrationService.handleOptionSelection(
+        caseId,
+        userId,
+        optionId,
+        comments,
+        partyType
+      );
 
       if (!result.success) {
         return res.status(400).json({
@@ -367,12 +403,19 @@ class DisputeController {
 
       res.json({
         success: true,
-        data: result.selection,
-        message: 'Option selected successfully'
+        data: {
+          selection: result.selection,
+          bothSelected: result.bothSelected,
+          sameOption: result.sameOption,
+          workflowIntegrated: true
+        },
+        message: result.bothSelected 
+          ? (result.sameOption ? 'Both parties selected same option - proceeding to settlement' : 'Different options selected - generating combined solution')
+          : 'Option selected successfully - waiting for other party'
       });
 
     } catch (error) {
-      logger.error('Error in selectOption:', error);
+      logger.error('Error in selectOption (enhanced):', error);
       res.status(500).json({
         success: false,
         error: error.message

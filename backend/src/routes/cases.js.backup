@@ -1,0 +1,455 @@
+const express = require('express');
+const router = express.Router();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- GRANT SELECT, INSERT ON court_referral_packages TO authenticated;-- GRANT SELECT, INSERT, UPDATE ON case_argument_status TO authenticated;-- Grant necessary permissions (adjust as needed for your setup)COMMENT ON COLUMN users.requires_password_change IS 'Whether user must change password on next login (for auto-generated accounts)';COMMENT ON COLUMN users.onboarding_case_id IS 'Case ID for which this defender account was auto-created';COMMENT ON COLUMN users.account_type IS 'Type of account: user, defender, admin';COMMENT ON TABLE court_referral_packages IS 'Stores comprehensive court referral packages with all case materials';COMMENT ON TABLE case_argument_status IS 'Tracks whether both parties have completed their arguments before AI Sheriff analysis';-- Insert helpful comment  EXECUTE FUNCTION update_updated_at_column();  FOR EACH ROW  BEFORE UPDATE ON case_argument_statusCREATE TRIGGER update_case_argument_status_updated_atDROP TRIGGER IF EXISTS update_case_argument_status_updated_at ON case_argument_status;-- Create trigger for case_argument_status$$ LANGUAGE plpgsql;END;  RETURN NEW;  NEW.updated_at = NOW();BEGINRETURNS TRIGGER AS $$CREATE OR REPLACE FUNCTION update_updated_at_column()-- Create function to update updated_at timestampEND $$;  END IF;    ALTER TABLE cases ADD COLUMN defender_user_id UUID REFERENCES users(id);                 WHERE table_name = 'cases' AND column_name = 'defender_user_id') THEN  IF NOT EXISTS (SELECT 1 FROM information_schema.columns BEGINDO $$ -- Add defender user ID to cases if not existsEND $$;  END IF;    ALTER TABLE cases ADD COLUMN defender_notified_at TIMESTAMP WITH TIME ZONE;                 WHERE table_name = 'cases' AND column_name = 'defender_notified_at') THEN  IF NOT EXISTS (SELECT 1 FROM information_schema.columns BEGINDO $$ -- Add defender notified timestamp to cases if not existsEND $$;  END IF;    ALTER TABLE users ADD COLUMN requires_password_change BOOLEAN DEFAULT FALSE;                 WHERE table_name = 'users' AND column_name = 'requires_password_change') THEN  IF NOT EXISTS (SELECT 1 FROM information_schema.columns BEGINDO $$ -- Add requires password change flag if not existsEND $$;  END IF;    ALTER TABLE users ADD COLUMN onboarding_case_id UUID REFERENCES cases(id);                 WHERE table_name = 'users' AND column_name = 'onboarding_case_id') THEN  IF NOT EXISTS (SELECT 1 FROM information_schema.columns BEGINDO $$ -- Add onboarding case ID to users table if not existsEND $$;  END IF;    ALTER TABLE users ADD COLUMN account_type VARCHAR(50) DEFAULT 'user';                 WHERE table_name = 'users' AND column_name = 'account_type') THEN  IF NOT EXISTS (SELECT 1 FROM information_schema.columns BEGINDO $$ -- Add account type to users table if not existsCREATE INDEX IF NOT EXISTS idx_court_packages_case_id ON court_referral_packages(case_id);-- Create index for court packages);  created_by UUID REFERENCES users(id)  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  -- Timestamps    manifest JSONB,  package_size BIGINT,  package_path TEXT NOT NULL,  -- Package details    case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),CREATE TABLE IF NOT EXISTS court_referral_packages (-- Create table for court referral packagesCREATE INDEX IF NOT EXISTS idx_case_argument_status_analysis_triggered ON case_argument_status(analysis_triggered);CREATE INDEX IF NOT EXISTS idx_case_argument_status_case_id ON case_argument_status(case_id);-- Create index for faster queries);  UNIQUE(case_id)  -- Ensure one record per case    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),  -- Timestamps    analysis_triggered_at TIMESTAMP WITH TIME ZONE,  analysis_triggered BOOLEAN DEFAULT FALSE,  -- Analysis trigger status    defender_user_id UUID REFERENCES users(id),  defender_confirmed_at TIMESTAMP WITH TIME ZONE,  defender_complete BOOLEAN DEFAULT FALSE,  -- Defender status    complainer_user_id UUID REFERENCES users(id),  complainer_confirmed_at TIMESTAMP WITH TIME ZONE,  complainer_complete BOOLEAN DEFAULT FALSE,  -- Complainer status    case_id UUID NOT NULL REFERENCES cases(id) ON DELETE CASCADE,  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),const { supabase } = require('../lib/supabaseClient');
+const { requireAuth } = require('../lib/authMiddleware');
+const CaseController = require('../controllers/CaseController');
+const multer = require('multer');
+const upload = multer({ dest: '/tmp/uploads' });
+const fs = require('fs');
+const crypto = require('crypto');
+const { v4: uuidv4 } = require('uuid');
+const { enqueueEvidence } = require('../lib/mediaWorker');
+
+// 1) create case
+router.post('/', requireAuth, async (req, res) => {
+  const { 
+    title, 
+    description, 
+    case_type, 
+    dispute_amount, 
+    priority,
+    currency 
+  } = req.body;
+  
+  // Get authenticated user ID from JWT token (req.user is set by auth middleware)
+  console.log('[cases] req.user:', JSON.stringify(req.user, null, 2));
+  console.log('[cases] req.body.filed_by:', req.body.filed_by);
+  
+  const userId = req.user?.sub || req.user?.id || req.body.filed_by;
+  
+  if (!title || !description) {
+    return res.status(400).json({ 
+      error: 'Missing required fields: title and description are required' 
+    });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ 
+      error: 'Authentication required. Please log in again.' 
+    });
+  }
+
+  try {
+    // First, verify the user exists in the database
+    console.log('[cases] Checking if user exists:', userId);
+    let { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('id, email, full_name')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (userError && userError.code !== 'PGRST116') {
+      console.error('[cases] Error checking user:', userError);
+      return res.status(500).json({ 
+        error: 'Database error checking user',
+        details: userError 
+      });
+    }
+
+    // If user doesn't exist in users table, create them
+    if (!userData) {
+      console.log('[cases] User not found in users table, creating user record...');
+      
+      // Get user info from req.user (set by auth middleware)
+      const userEmail = req.user?.email || `user-${userId}@temp.com`;
+      const userName = req.user?.name || 'User';
+      
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert([{
+          id: userId,
+          email: userEmail,
+          full_name: userName,
+          password_hash: 'oauth_user' // placeholder for OAuth users
+        }])
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('[cases] Failed to create user:', createError);
+        return res.status(500).json({ 
+          error: 'Failed to create user record',
+          details: createError 
+        });
+      }
+
+      console.log('[cases] User created successfully:', newUser.id);
+      userData = newUser;
+    }
+
+    console.log('[cases] User exists, creating case...');
+
+    const caseData = {
+      title,
+      description,
+      case_type: case_type || 'other',
+      filed_by: userId,
+      created_by: userId, // Both filed_by and created_by should be set
+      priority: priority || 'medium',
+      currency: currency || 'INR'
+    };
+
+    // Add dispute_amount only if provided
+    if (dispute_amount) {
+      caseData.dispute_amount = parseFloat(dispute_amount);
+    }
+
+    console.log('[cases] Creating case with data:', JSON.stringify(caseData, null, 2));
+
+    const { data, error } = await supabase
+      .from('cases')
+      .insert([caseData])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('[cases] Supabase error:', error);
+      return res.status(500).json({ 
+        error: error.message || 'Failed to create case',
+        details: error 
+      });
+    }
+    
+    console.log('[cases] Case created successfully:', data.id);
+    return res.json(data);
+  } catch (err) {
+    console.error('[cases] create error', err);
+    return res.status(500).json({ 
+      error: err.message || 'Internal server error' 
+    });
+  }
+});
+
+// 0) list cases (GET /)
+router.get('/', async (req, res) => {
+  try {
+    const { data, error } = await supabase.from('cases').select('*').order('created_at', { ascending: false });
+    if (error) return res.status(500).json({ error });
+    return res.json(data || []);
+  } catch (err) {
+    console.error('[cases] list error', err);
+    return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// 2) upload evidence: multipart (file + uploader_id)
+// This uploads file to Supabase storage, inserts evidence row, enqueues for background processing (non-blocking) and returns record + publicUrl
+router.post('/:id/evidence', upload.single('file'), async (req, res) => {
+  let { id: caseId } = req.params;
+  // Sanitize caseId for storage key: allow only alphanumeric, dash, underscore
+  caseId = String(caseId).replace(/[^a-zA-Z0-9_-]/g, '');
+  // defensive extraction to avoid earlier 'cannot destructure' crash
+  const uploader_id = (req.body && req.body.uploader_id) ? req.body.uploader_id : null;
+
+  if (!req.file) return res.status(400).json({ error: 'no file' });
+  if (!uploader_id) return res.status(400).json({ error: 'uploader_id required' });
+
+  try {
+    const localPath = req.file.path;
+    const fileBuffer = fs.readFileSync(localPath);
+    const sha256 = crypto.createHash('sha256').update(fileBuffer).digest('hex');
+    const ext = req.file.originalname.split('.').pop();
+    const filename = `${caseId}/${uuidv4()}.${ext}`;
+
+    // upload to supabase storage
+    const bucket = process.env.SUPABASE_BUCKET || 'evidence';
+    const { data: uploadData, error: uploadErr } = await supabase.storage
+      .from(bucket)
+      .upload(filename, fileBuffer, { contentType: req.file.mimetype, upsert: false });
+
+    if (uploadErr) throw uploadErr;
+
+    const publicUrl = `${process.env.SUPABASE_URL}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`;
+
+    // insert record to evidence table
+    const { data, error } = await supabase
+      .from('evidence')
+      .insert([{
+        case_id: caseId,
+        uploader_id,
+        file_path: filename,
+        file_url: publicUrl,
+        sha256,
+        metadata: { original_name: req.file.originalname, mime: req.file.mimetype },
+      }])
+      .select()
+      .single();
+
+    // cleanup local file
+    try { fs.unlinkSync(localPath); } catch (e) { /* noop */ }
+
+    if (error) return res.status(500).json({ error });
+
+    // enqueue for background processing (non-blocking)
+    try {
+      enqueueEvidence(data.id);
+      console.log('[cases] enqueued evidence', data.id);
+    } catch (e) {
+      console.warn('[cases] enqueue failed', e);
+    }
+
+    // return evidence record + public url
+    res.json({ ...data, publicUrl });
+  } catch (err) {
+    console.error('[cases] upload error', err);
+    return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// Get case timeline
+router.get('/:id/timeline', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { type } = req.query; // Optional filter by event type
+
+    // Use TimelineService to fetch real timeline events from DB
+    const TimelineService = require('../services/TimelineService');
+    const raw = await TimelineService.getCaseTimeline(id, true);
+
+    // Map DB rows to API shape expected by frontend
+    const timelineEvents = (raw || []).map((row) => ({
+      id: String(row.id || row.id),
+      caseId: row.case_id || id,
+      type: row.event_type,
+      title: row.event_title,
+      description: row.event_description,
+      actor: row.actor_name || row.actor_id || 'System',
+      timestamp: row.created_at || row.createdAt || new Date().toISOString(),
+      metadata: row.metadata || {}
+    }));
+
+    // Filter by type if provided
+    let filtered = timelineEvents;
+    if (type && type !== 'all') {
+      filtered = timelineEvents.filter(event => event.type === type);
+    }
+
+    res.json({
+      success: true,
+      data: filtered
+    });
+  } catch (err) {
+    console.error('[cases] timeline error', err);
+    return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// Invite parties to case
+router.post('/:id/invite', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { parties } = req.body; // Array of { name, email, role }
+
+    if (!parties || !Array.isArray(parties)) {
+      return res.status(400).json({ error: 'parties array is required' });
+    }
+
+    // Determine inviter user id (may be provided in tests via body or from authenticated req.user)
+    const inviterUserId = (req.user && req.user.id) ? req.user.id : (req.body.inviter_id || null);
+    if (!inviterUserId) {
+      return res.status(401).json({ error: 'Authentication required to invite parties' });
+    }
+
+    const InvitationService = require('../services/InvitationService');
+
+    const results = [];
+    for (const party of parties) {
+      try {
+        const r = await InvitationService.inviteParty(id, inviterUserId, {
+          email: party.email,
+          name: party.name,
+          role: party.role || 'defendant',
+          message: party.message || null
+        });
+
+        if (r.success) {
+          results.push({
+            name: party.name,
+            email: party.email,
+            status: 'pending',
+            invitation_token: r.invitation_token,
+            invitedAt: (r.invitation && r.invitation.invited_at) || (r.expires_at ? new Date().toISOString() : new Date().toISOString())
+          });
+        } else {
+          results.push({
+            name: party.name,
+            email: party.email,
+            status: 'error',
+            error: r.error || 'Failed to create invitation'
+          });
+        }
+      } catch (e) {
+        results.push({
+          name: party.name,
+          email: party.email,
+          status: 'error',
+          error: e.message || String(e)
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: results,
+      message: `Processed ${results.length} invitation${results.length !== 1 ? 's' : ''}`
+    });
+
+  } catch (err) {
+    console.error('[cases] invite error', err);
+    return res.status(500).json({ error: err.message || err });
+  }
+});
+
+// ===== NEW ENDPOINTS FOR ENHANCED FEATURES =====
+
+// POST /:id/onboard-defender - Auto-create defender account when case is filed
+router.post('/:id/onboard-defender', requireAuth, CaseController.onboardDefender);
+
+// POST /:id/resend-credentials - Resend defender login credentials
+router.post('/:id/resend-credentials', requireAuth, CaseController.resendDefenderCredentials);
+
+// GET /:id/argument-status - Get argument completion status for both parties
+router.get('/:id/argument-status', requireAuth, CaseController.getArgumentStatus);
+
+// POST /:id/confirm-arguments - Confirm arguments completion by party
+router.post('/:id/confirm-arguments', requireAuth, CaseController.confirmArguments);
+
+// POST /:id/trigger-sheriff-analysis - Trigger AI Sheriff analysis after both parties confirm
+router.post('/:id/trigger-sheriff-analysis', requireAuth, CaseController.triggerSheriffAnalysis);
+
+// POST /:id/create-court-package - Create comprehensive court referral package (ZIP)
+router.post('/:id/create-court-package', requireAuth, CaseController.createCourtPackage);
+
+// GET /:id/court-package - Get court package information
+router.get('/:id/court-package', requireAuth, CaseController.getCourtPackage);
+
+module.exports = router;

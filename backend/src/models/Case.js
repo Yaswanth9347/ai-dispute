@@ -14,6 +14,13 @@ class Case extends BaseModel {
         throw new Error('Case title and filed_by are required');
       }
 
+      // Validate defender information if provided
+      if (caseData.defenderInfo) {
+        if (!caseData.defenderInfo.name || !caseData.defenderInfo.email) {
+          throw new Error('Defender name and email are required');
+        }
+      }
+
       // Create the case
       const caseRecord = await this.create({
         title: caseData.title,
@@ -30,7 +37,17 @@ class Case extends BaseModel {
         mediation_required: caseData.mediation_required || false,
         metadata: caseData.metadata || {},
         is_public: caseData.is_public || false,
-        status: 'draft'
+        status: 'draft',
+        // Defender information
+        defender_name: caseData.defenderInfo?.name,
+        defender_email: caseData.defenderInfo?.email,
+        defender_phone: caseData.defenderInfo?.phone,
+        defender_address: caseData.defenderInfo?.address,
+        // Dispute workflow fields
+        statement_deadline: null,
+        ai_analysis_started_at: null,
+        solution_options_generated_at: null,
+        parties_response_deadline: null
       });
 
       // Create initial timeline entry
@@ -239,6 +256,105 @@ class Case extends BaseModel {
       return data || [];
     } catch (error) {
       throw new Error(`Failed to search cases: ${error.message}`);
+    }
+  }
+
+  // Send notification to defender about case filing
+  async notifyDefender(caseId) {
+    try {
+      const caseData = await this.findById(caseId);
+      if (!caseData || !caseData.defender_email) {
+        throw new Error('Case or defender email not found');
+      }
+
+      const emailService = require('../services/EmailService');
+      const smsService = require('../services/SMSService');
+
+      // Send email notification
+      await emailService.sendDisputeFileNotification(caseData.defender_email, {
+        defenderName: caseData.defender_name,
+        caseTitle: caseData.title,
+        caseNumber: caseData.case_number,
+        complainerName: caseData.filed_by_name,
+        caseType: caseData.case_type,
+        description: caseData.description
+      });
+
+      // Send SMS notification if phone number provided
+      if (caseData.defender_phone) {
+        await smsService.sendDisputeFileNotification(caseData.defender_phone, {
+          defenderName: caseData.defender_name,
+          caseTitle: caseData.title,
+          caseNumber: caseData.case_number
+        });
+      }
+
+      // Update case to mark notification sent
+      await this.updateById(caseId, {
+        defender_notified_at: new Date().toISOString(),
+        status: 'open'
+      });
+
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to notify defender: ${error.message}`);
+    }
+  }
+
+  // Start statement collection phase
+  async startStatementPhase(caseId, hours = 48) {
+    try {
+      const statementDeadline = new Date();
+      statementDeadline.setHours(statementDeadline.getHours() + hours);
+
+      await this.updateById(caseId, {
+        statement_deadline: statementDeadline.toISOString(),
+        status: 'statement_phase'
+      });
+
+      // Notify both parties to submit statements
+      const notificationService = require('../services/NotificationService');
+      await notificationService.notifyStatementsNeeded(caseId);
+
+      return { statementDeadline };
+    } catch (error) {
+      throw new Error(`Failed to start statement phase: ${error.message}`);
+    }
+  }
+
+  // Check if statement phase is complete
+  async isStatementPhaseComplete(caseId) {
+    try {
+      const Statement = require('./Statement');
+      const statements = await Statement.findAll({ case_id: caseId });
+      
+      // Check if both parties have submitted statements
+      const partyStatements = statements.reduce((acc, stmt) => {
+        acc[stmt.party_type] = true;
+        return acc;
+      }, {});
+
+      return partyStatements.complainer && partyStatements.defender;
+    } catch (error) {
+      throw new Error(`Failed to check statement phase: ${error.message}`);
+    }
+  }
+
+  // Start AI analysis phase
+  async startAIAnalysisPhase(caseId) {
+    try {
+      await this.updateById(caseId, {
+        ai_analysis_started_at: new Date().toISOString(),
+        status: 'ai_analysis'
+      });
+
+      // Trigger AI analysis process
+      const aiService = require('../services/AdvancedAIService');
+      await aiService.analyzeDisputeCase(caseId);
+
+      return true;
+    } catch (error) {
+      throw new Error(`Failed to start AI analysis: ${error.message}`);
     }
   }
 }

@@ -1,356 +1,286 @@
-// AI Controller - RESTful API endpoints for AI analysis features
-const AIAnalysisService = require('../services/AIAnalysisService');
-const asyncHandler = require('../lib/asyncHandler');
-const HttpError = require('../lib/HttpError');
+// AI Controller - Handle AI-powered dispute resolution with workflow integration
+const AIService = require('../services/AIService');
+const AIWorkflowIntegrationService = require('../services/AIWorkflowIntegrationService');
+const { validationResult } = require('express-validator');
 
 class AIController {
-  // POST /api/ai/analyze-case/:caseId
-  analyzeCase = asyncHandler(async (req, res) => {
-    const { caseId } = req.params;
-    const userId = req.user.id;
-
-    if (!caseId) {
-      throw new HttpError(400, 'Case ID is required');
-    }
-
-    const result = await AIAnalysisService.analyzeCase(caseId, userId);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Case analysis failed');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Case analysis completed successfully',
-      data: {
-        analysis_id: result.analysis_id,
-        analysis_data: result.analysis_data,
-        metadata: result.metadata
+  // Analyze a case for dispute resolution (workflow-integrated)
+  async analyzeCase(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
       }
-    });
-  });
 
-  // POST /api/ai/settlement-proposals/:caseId
-  generateSettlementProposals = asyncHandler(async (req, res) => {
-    const { caseId } = req.params;
-    const userId = req.user.id;
-    const preferences = req.body.preferences || {};
+      const { caseId } = req.params;
+      const userId = req.user.id;
 
-    if (!caseId) {
-      throw new HttpError(400, 'Case ID is required');
-    }
+      // Use workflow integration service to trigger AI analysis
+      const result = await AIWorkflowIntegrationService.triggerAIAnalysis(caseId, userId);
 
-    const result = await AIAnalysisService.generateSettlementProposals(caseId, userId, preferences);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Settlement proposal generation failed');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `Generated ${result.proposals.length} settlement proposals`,
-      data: {
-        proposals: result.proposals,
-        ai_insights: result.ai_insights,
-        case_id: result.case_id
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: result.error || 'Failed to analyze case'
+        });
       }
-    });
-  });
 
-  // POST /api/ai/analyze-evidence/:evidenceId
-  analyzeEvidence = asyncHandler(async (req, res) => {
-    const { evidenceId } = req.params;
-    const userId = req.user.id;
-
-    if (!evidenceId) {
-      throw new HttpError(400, 'Evidence ID is required');
-    }
-
-    const result = await AIAnalysisService.analyzeEvidence(evidenceId, userId);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Evidence analysis failed');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Evidence analysis completed successfully',
-      data: {
-        analysis_id: result.analysis_id,
-        evidence_analysis: result.evidence_analysis,
-        evidence_id: result.evidence_id
-      }
-    });
-  });
-
-  // POST /api/ai/legal-research/:caseId
-  conductLegalResearch = asyncHandler(async (req, res) => {
-    const { caseId } = req.params;
-    const userId = req.user.id;
-    const { research_query } = req.body;
-
-    if (!caseId) {
-      throw new HttpError(400, 'Case ID is required');
-    }
-
-    const result = await AIAnalysisService.conductLegalResearch(caseId, userId, research_query);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Legal research failed');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Legal research completed successfully',
-      data: {
-        analysis_id: result.analysis_id,
-        research_data: result.research_data,
-        case_id: result.case_id
-      }
-    });
-  });
-
-  // POST /api/ai/risk-assessment/:caseId
-  assessRisks = asyncHandler(async (req, res) => {
-    const { caseId } = req.params;
-    const userId = req.user.id;
-
-    if (!caseId) {
-      throw new HttpError(400, 'Case ID is required');
-    }
-
-    const result = await AIAnalysisService.assessRisks(caseId, userId);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Risk assessment failed');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Risk assessment completed successfully',
-      data: {
-        analysis_id: result.analysis_id,
-        risk_assessment: result.risk_assessment,
-        case_id: result.case_id
-      }
-    });
-  });
-
-  // GET /api/ai/analyses/:caseId
-  getCaseAnalyses = asyncHandler(async (req, res) => {
-    const { caseId } = req.params;
-    const userId = req.user.id;
-
-    if (!caseId) {
-      throw new HttpError(400, 'Case ID is required');
-    }
-
-    const result = await AIAnalysisService.getCaseAnalyses(caseId, userId);
-
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Failed to retrieve case analyses');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: `Retrieved ${result.count} analyses for case ${caseId}`,
-      data: {
-        analyses: result.analyses,
-        case_id: result.case_id,
-        count: result.count
-      }
-    });
-  });
-
-  // POST /api/ai/bulk-analyze
-  bulkAnalyze = asyncHandler(async (req, res) => {
-    const userId = req.user.id;
-    const { case_ids, analysis_types } = req.body;
-
-    if (!case_ids || !Array.isArray(case_ids) || case_ids.length === 0) {
-      throw new HttpError(400, 'case_ids array is required');
-    }
-
-    if (!analysis_types || !Array.isArray(analysis_types) || analysis_types.length === 0) {
-      throw new HttpError(400, 'analysis_types array is required');
-    }
-
-    const validAnalysisTypes = ['case_analysis', 'risk_assessment', 'legal_research'];
-    const invalidTypes = analysis_types.filter(type => !validAnalysisTypes.includes(type));
-    
-    if (invalidTypes.length > 0) {
-      throw new HttpError(400, `Invalid analysis types: ${invalidTypes.join(', ')}`);
-    }
-
-    const results = [];
-
-    for (const caseId of case_ids) {
-      const caseResults = { case_id: caseId, analyses: {} };
-
-      for (const analysisType of analysis_types) {
-        try {
-          let result;
-
-          switch (analysisType) {
-            case 'case_analysis':
-              result = await AIAnalysisService.analyzeCase(caseId, userId);
-              break;
-            case 'risk_assessment':
-              result = await AIAnalysisService.assessRisks(caseId, userId);
-              break;
-            case 'legal_research':
-              result = await AIAnalysisService.conductLegalResearch(caseId, userId);
-              break;
-          }
-
-          caseResults.analyses[analysisType] = {
-            success: result.success,
-            analysis_id: result.analysis_id,
-            error: result.error
-          };
-
-        } catch (error) {
-          caseResults.analyses[analysisType] = {
-            success: false,
-            error: error.message
-          };
+      res.json({
+        success: true,
+        message: 'Case analysis completed and workflow updated',
+        data: {
+          analysis: result.analysis,
+          analysisId: result.analysisId,
+          processingTime: result.processingTime,
+          workflowUpdated: true
         }
+      });
+
+    } catch (error) {
+      console.error('Error in AI case analysis:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to analyze case',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Generate settlement options (workflow-integrated)
+  async generateSettlementOptions(req, res) {
+    try {
+      const { caseId } = req.params;
+      const userId = req.user.id;
+
+      // Use workflow integration service to generate settlement options
+      const result = await AIWorkflowIntegrationService.generateSettlementOptions(caseId, userId);
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: result.error || 'Failed to generate settlement options'
+        });
       }
 
-      results.push(caseResults);
-    }
-
-    const successCount = results.reduce((count, result) => {
-      return count + Object.values(result.analyses).filter(analysis => analysis.success).length;
-    }, 0);
-
-    const totalCount = case_ids.length * analysis_types.length;
-
-    res.status(200).json({
-      success: true,
-      message: `Bulk analysis completed: ${successCount}/${totalCount} analyses successful`,
-      data: {
-        results,
-        summary: {
-          total_cases: case_ids.length,
-          analysis_types: analysis_types,
-          successful_analyses: successCount,
-          total_analyses: totalCount,
-          success_rate: Math.round((successCount / totalCount) * 100)
+      res.json({
+        success: true,
+        message: 'Settlement options generated and workflow updated',
+        data: {
+          options: result.options,
+          optionsId: result.optionsId,
+          activeOptionsId: result.activeOptionsId,
+          processingTime: result.processingTime,
+          workflowUpdated: true
         }
+      });
+
+    } catch (error) {
+      console.error('Error generating settlement options:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate settlement options',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Record a party's option selection (workflow-integrated)
+  async selectOption(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
       }
-    });
-  });
 
-  // GET /api/ai/analysis/:analysisId
-  getAnalysisById = asyncHandler(async (req, res) => {
-    const { analysisId } = req.params;
-    const userId = req.user.id;
+      const { caseId, optionId } = req.params;
+      const { reasoning } = req.body;
+      const userId = req.user.id;
 
-    if (!analysisId) {
-      throw new HttpError(400, 'Analysis ID is required');
-    }
-
-    // Import AIAnalysis model to fetch specific analysis
-    const AIAnalysis = require('../models/AIAnalysis');
-    const Case = require('../models/Case');
-
-    const analysis = await AIAnalysis.findById(analysisId);
-
-    if (!analysis) {
-      throw new HttpError(404, 'Analysis not found');
-    }
-
-    // Check access to the case
-    if (!await Case.hasAccess(analysis.case_id, userId)) {
-      throw new HttpError(403, 'Access denied to this analysis');
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Analysis retrieved successfully',
-      data: {
-        analysis
+      // Verify case access and get party type
+      const Case = require('../models/Case');
+      const caseData = await Case.getById(caseId);
+      if (!caseData) {
+        return res.status(404).json({
+          success: false,
+          message: 'Case not found'
+        });
       }
-    });
-  });
 
-  // POST /api/ai/reanalyze/:analysisId
-  reAnalyze = asyncHandler(async (req, res) => {
-    const { analysisId } = req.params;
-    const userId = req.user.id;
+      let partyType;
+      if (caseData.filed_by === userId) {
+        partyType = 'complainer';
+      } else if (caseData.defender_id === userId) {
+        partyType = 'defender';
+      } else {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied'
+        });
+      }
 
-    if (!analysisId) {
-      throw new HttpError(400, 'Analysis ID is required');
-    }
+      // Use workflow integration service to handle option selection
+      const result = await AIWorkflowIntegrationService.handleOptionSelection(
+        caseId, 
+        userId, 
+        optionId, 
+        reasoning, 
+        partyType
+      );
 
-    // Import required models
-    const AIAnalysis = require('../models/AIAnalysis');
-    const Case = require('../models/Case');
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: result.error || 'Failed to record option selection'
+        });
+      }
 
-    const originalAnalysis = await AIAnalysis.findById(analysisId);
-
-    if (!originalAnalysis) {
-      throw new HttpError(404, 'Original analysis not found');
-    }
-
-    // Check access
-    if (!await Case.hasAccess(originalAnalysis.case_id, userId)) {
-      throw new HttpError(403, 'Access denied to this analysis');
-    }
-
-    let result;
-
-    // Re-run the same type of analysis
-    switch (originalAnalysis.analysis_type) {
-      case 'case_analysis':
-        result = await AIAnalysisService.analyzeCase(originalAnalysis.case_id, userId);
-        break;
-      case 'risk_assessment':
-        result = await AIAnalysisService.assessRisks(originalAnalysis.case_id, userId);
-        break;
-      case 'legal_research':
-        result = await AIAnalysisService.conductLegalResearch(originalAnalysis.case_id, userId);
-        break;
-      case 'evidence_analysis':
-        if (originalAnalysis.evidence_id) {
-          result = await AIAnalysisService.analyzeEvidence(originalAnalysis.evidence_id, userId);
-        } else {
-          throw new HttpError(400, 'Cannot re-analyze evidence analysis without evidence ID');
+      res.json({
+        success: true,
+        message: 'Option selection recorded and workflow updated',
+        data: {
+          selection: result.selection,
+          bothSelected: result.bothSelected,
+          sameOption: result.sameOption,
+          workflowUpdated: true
         }
-        break;
-      default:
-        throw new HttpError(400, `Unsupported analysis type for re-analysis: ${originalAnalysis.analysis_type}`);
-    }
+      });
 
-    if (!result.success) {
-      throw new HttpError(500, result.error || 'Re-analysis failed');
+    } catch (error) {
+      console.error('Error selecting option:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to record option selection',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
+  }
 
-    res.status(200).json({
-      success: true,
-      message: 'Re-analysis completed successfully',
-      data: {
-        new_analysis_id: result.analysis_id,
-        original_analysis_id: analysisId,
-        analysis_type: originalAnalysis.analysis_type,
-        case_id: originalAnalysis.case_id
+  // Get AI workflow status for a case
+  async getCaseAIStatus(req, res) {
+    try {
+      const { caseId } = req.params;
+      const userId = req.user.id;
+
+      // Verify case access
+      const Case = require('../models/Case');
+      const caseData = await Case.getById(caseId);
+      if (!caseData || (caseData.filed_by !== userId && caseData.defender_id !== userId)) {
+        return res.status(404).json({
+          success: false,
+          message: 'Case not found or access denied'
+        });
       }
+
+      // Get AI workflow status
+      const result = await AIWorkflowIntegrationService.getAIWorkflowStatus(caseId);
+
+      if (!result.success) {
+        return res.status(500).json({
+          success: false,
+          message: result.error || 'Failed to get AI workflow status'
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'AI workflow status retrieved',
+        data: result.status
+      });
+
+    } catch (error) {
+      console.error('Error getting AI workflow status:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get AI workflow status',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Accept the AI-generated combined solution
+  async acceptCombinedSolution(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const { caseId } = req.params;
+      const userId = req.user.id;
+
+      const result = await AIWorkflowIntegrationService.finalizeConsensus(caseId, userId);
+
+      if (result.success) {
+        res.json({
+          success: true,
+          message: 'Combined solution accepted successfully',
+          workflow_state: result.workflow_state,
+          final_solution: result.final_solution
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          message: result.error || 'Failed to accept combined solution'
+        });
+      }
+    } catch (error) {
+      console.error('Error accepting combined solution:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to accept combined solution',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Stub methods for routes compatibility
+  async analyzeEvidence(req, res) {
+    res.status(501).json({ success: false, message: 'Evidence analysis not implemented yet' });
+  }
+
+  async conductLegalResearch(req, res) {
+    res.status(501).json({ success: false, message: 'Legal research not implemented yet' });
+  }
+
+  async assessRisks(req, res) {
+    res.status(501).json({ success: false, message: 'Risk assessment not implemented yet' });
+  }
+
+  async getCaseAnalyses(req, res) {
+    res.status(501).json({ success: false, message: 'Case analyses retrieval not implemented yet' });
+  }
+
+  async getAnalysisById(req, res) {
+    res.status(501).json({ success: false, message: 'Analysis by ID not implemented yet' });
+  }
+
+  async bulkAnalyze(req, res) {
+    res.status(501).json({ success: false, message: 'Bulk analysis not implemented yet' });
+  }
+
+  async reAnalyze(req, res) {
+    res.status(501).json({ success: false, message: 'Re-analysis not implemented yet' });
+  }
+
+  async healthCheck(req, res) {
+    res.json({ 
+      success: true, 
+      message: 'AI Controller is running',
+      timestamp: new Date().toISOString()
     });
-  });
-
-  // GET /api/ai/health
-  healthCheck = asyncHandler(async (req, res) => {
-    const healthStatus = await AIAnalysisService.healthCheck();
-
-    const httpStatus = healthStatus.status === 'operational' ? 200 : 503;
-
-    res.status(httpStatus).json({
-      success: healthStatus.status === 'operational',
-      message: `AI service is ${healthStatus.status}`,
-      data: healthStatus
-    });
-  });
+  }
 }
 
 module.exports = new AIController();

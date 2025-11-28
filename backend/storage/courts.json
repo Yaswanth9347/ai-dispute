@@ -1,0 +1,92 @@
+{
+  "supreme_court": {
+    "name": "Supreme Court of India",
+    "jurisdiction": "National",
+    "location": "New Delhi",
+    "address": "Tilak Marg, New Delhi 110001",
+    "phone": "+91-11-2338-4535",
+    "email": "supremecourt@nic.in",
+    "filing_process": "Online e-filing through Supreme Court website",
+    "court_fees": "Variable based on case type",
+    "applicable_cases": [
+      "Constitutional matters",
+      "Appeals from High Courts",
+      "Special leave petitions"
+    ]
+  },
+  "delhi_high_court": {
+    "name": "Delhi High Court",
+    "jurisdiction": "Delhi",
+    "location": "New Delhi",
+    "address": "Sher Shah Road, New Delhi 110003",
+    "phone": "+91-11-2389-3037",
+    "email": "delhihc@nic.in",
+    "filing_process": "Physical filing or e-filing portal",
+    "court_fees": "₹10,000 - ₹50,000 (civil disputes)",
+    "applicable_cases": [
+      "Civil disputes above ₹20 lakhs",
+      "Writ petitions",
+      "Appeals"
+    ]
+  },
+  "mumbai_high_court": {
+    "name": "Bombay High Court",
+    "jurisdiction": "Maharashtra, Goa, Dadra and Nagar Haveli",
+    "location": "Mumbai",
+    "address": "Fort, Mumbai 400001",
+    "phone": "+91-22-2266-1224",
+    "email": "bombayhc@nic.in",
+    "filing_process": "Physical filing or e-filing portal",
+    "court_fees": "₹10,000 - ₹50,000 (civil disputes)",
+    "applicable_cases": [
+      "Civil disputes above ₹20 lakhs",
+      "Commercial disputes",
+      "IP matters"
+    ]
+  },
+  "bangalore_high_court": {
+    "name": "Karnataka High Court",
+    "jurisdiction": "Karnataka",
+    "location": "Bangalore",
+    "address": "Attara Kacheri Road, Bangalore 560001",
+    "phone": "+91-80-2221-4652",
+    "email": "karnatakahc@nic.in",
+    "filing_process": "Physical filing or e-filing portal",
+    "court_fees": "₹10,000 - ₹50,000 (civil disputes)",
+    "applicable_cases": [
+      "Civil disputes",
+      "Service matters",
+      "Land disputes"
+    ]
+  },
+  "district_court_civil": {
+    "name": "District Court (Civil)",
+    "jurisdiction": "District level",
+    "location": "Various",
+    "address": "As per district",
+    "phone": "District specific",
+    "email": "District specific",
+    "filing_process": "Physical filing at court premises",
+    "court_fees": "₹500 - ₹10,000 (civil disputes)",
+    "applicable_cases": [
+      "Civil disputes up to ₹20 lakhs",
+      "Property disputes",
+      "Contract disputes"
+    ]
+  },
+  "consumer_court": {
+    "name": "Consumer Disputes Redressal Forum",
+    "jurisdiction": "Consumer matters",
+    "location": "Various",
+    "address": "District/State/National level",
+    "phone": "Forum specific",
+    "email": "Forum specific",
+    "filing_process": "Online through National Consumer Helpline or physical filing",
+    "court_fees": "No court fees for disputes up to ₹20 lakhs",
+    "applicable_cases": [
+      "Consumer complaints",
+      "Service deficiency",
+      "Product defects"
+    ]
+  }
+}

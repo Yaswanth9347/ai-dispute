@@ -1,0 +1,62 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{notification.title}}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 20px auto; background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; margin: -20px -20px 20px -20px; }
+        .content { padding: 20px 0; }
+        .button { display: inline-block; padding: 12px 30px; background-color: #667eea; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }
+        .case-info { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .urgent { border-left: 4px solid #e74c3c; }
+        .info { border-left: 4px solid #3498db; }
+        .success { border-left: 4px solid #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AI Dispute Resolution Platform</h1>
+            <p>{{notification.title}}</p>
+        </div>
+        
+        <div class="content">
+            <p>Dear {{user.name}},</p>
+            
+            <p>{{notification.message}}</p>
+            
+            {{#if case}}
+            <div class="case-info {{notification.type}}">
+                <h3>Case Information</h3>
+                <p><strong>Case ID:</strong> {{case.id}}</p>
+                <p><strong>Title:</strong> {{case.title}}</p>
+                <p><strong>Status:</strong> {{case.status}}</p>
+                <p><strong>Last Updated:</strong> {{case.updated}}</p>
+            </div>
+            {{/if}}
+            
+            {{#if notification.action_url}}
+            <p style="text-align: center;">
+                <a href="{{notification.action_url}}" class="button">{{notification.action_text}}</a>
+            </p>
+            {{/if}}
+            
+            <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+            
+            <p>Best regards,<br>
+            The AI Dispute Resolution Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>© 2025 AI Dispute Resolution Platform. All rights reserved.</p>
+            <p>This is an automated message. Please do not reply to this email.</p>
+            <p>Generated on: {{generated.timestamp}}</p>
+        </div>
+    </div>
+</body>
+</html>

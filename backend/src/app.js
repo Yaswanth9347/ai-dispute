@@ -70,6 +70,8 @@ if (isTest) {
   const dashboardRouter = require('./routes/dashboard');
   // Search Routes for testing
   const searchRouter = require('./routes/search');
+  // AI Integration Routes for testing
+  const aiIntegrationRouter = require('./routes/ai');
   
   app.use('/api/auth', authRouter);
   app.use('/api/ai/advanced', advancedAIRouter);
@@ -78,6 +80,7 @@ if (isTest) {
   app.use('/api/analytics', analyticsRouter);
   app.use('/api/dashboard', dashboardRouter);
   app.use('/api/search', searchRouter);
+  app.use('/api/ai-integration', aiIntegrationRouter);
 }
 
 if (!isTest) {
@@ -186,6 +189,15 @@ app.use('/uploads', express.static('uploads'));
   // Dispute Resolution Routes (NEW - Complete Workflow)
   const disputesRouter = require('./routes/disputes');
   app.use('/api/disputes', disputesRouter);
+  // Case Management Routes (Phase 2 - Enhanced case operations)
+  const caseManagementRouter = require('./routes/case-management');
+  app.use('/api/case-management', caseManagementRouter);
+  // AI Integration Routes (Phase 3 - Complete AI-powered dispute resolution)
+  const aiIntegrationRouter = require('./routes/ai');
+  app.use('/api/ai-integration', aiIntegrationRouter);
+  // Document & Resolution Routes (Phase 6 - Complete document management and case resolution)
+  const documentResolutionRouter = require('./routes/documentResolution');
+  app.use('/api/document-resolution', documentResolutionRouter);
 }
 
 // metrics endpoint

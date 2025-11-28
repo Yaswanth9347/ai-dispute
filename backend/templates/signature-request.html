@@ -1,0 +1,77 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Signature Request</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 0 15px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #667eea; }
+        .signature-section { background-color: #f8f9fa; padding: 20px; border-radius: 5px; margin: 20px 0; border: 2px dashed #667eea; }
+        .document-preview { background-color: #fff; border: 1px solid #ddd; padding: 15px; margin: 15px 0; border-radius: 5px; }
+        .action-buttons { text-align: center; margin: 30px 0; }
+        .btn-sign { background-color: #27ae60; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 10px; display: inline-block; }
+        .btn-view { background-color: #3498db; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 10px; display: inline-block; }
+        .security-info { background-color: #fff8dc; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #f39c12; }
+        .footer { text-align: center; padding-top: 20px; border-top: 1px solid #eee; color: #666; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Digital Signature Request</h1>
+            <p>Your signature is required for the following document</p>
+        </div>
+        
+        <div class="content">
+            <p>Dear {{recipient.name}},</p>
+            
+            <p>A document has been prepared and requires your digital signature to proceed. Please review the document carefully before signing.</p>
+            
+            <div class="document-preview">
+                <h3>{{document.title}}</h3>
+                <p><strong>Document Type:</strong> {{document.type}}</p>
+                <p><strong>Case ID:</strong> {{case.id}}</p>
+                <p><strong>Prepared On:</strong> {{document.created}}</p>
+                <p><strong>Deadline for Signature:</strong> {{signature.deadline}}</p>
+            </div>
+            
+            <div class="signature-section">
+                <h3>Signature Required</h3>
+                <p><strong>Your Role:</strong> {{recipient.role}}</p>
+                <p><strong>Signature Type:</strong> Digital Certificate</p>
+                <p><strong>Legal Binding:</strong> Yes, under Indian IT Act 2000</p>
+                <p><strong>Security Level:</strong> 2048-bit RSA Encryption</p>
+            </div>
+            
+            <div class="action-buttons">
+                <a href="{{urls.view_document}}" class="btn-view">View Document</a>
+                <a href="{{urls.sign_document}}" class="btn-sign">Sign Document</a>
+            </div>
+            
+            <div class="security-info">
+                <h4>Security Information</h4>
+                <p>• Your signature will be cryptographically secured</p>
+                <p>• Document integrity is guaranteed through blockchain technology</p>
+                <p>• All signatures are legally binding under Indian law</p>
+                <p>• Full audit trail maintained for compliance</p>
+            </div>
+            
+            <p><strong>Important:</strong> Please sign the document before {{signature.deadline}} to avoid delays in the dispute resolution process.</p>
+            
+            <p>If you have any questions about this document or the signing process, please contact our support team immediately.</p>
+            
+            <p>Best regards,<br>
+            The AI Dispute Resolution Team</p>
+        </div>
+        
+        <div class="footer">
+            <p>© 2025 AI Dispute Resolution Platform. All rights reserved.</p>
+            <p>This signature request was generated automatically - Request ID: {{request.id}}</p>
+            <p>For support, email: support@aidispute.com or call: +91-1800-XXX-XXXX</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Court Referral Document - {{case.id}}</title>
+    <style>
+        body { font-family: 'Times New Roman', serif; margin: 0; padding: 20px; line-height: 1.8; }
+        .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 20px; margin-bottom: 30px; }
+        .section { margin: 30px 0; }
+        .section h3 { font-size: 16px; text-decoration: underline; margin-bottom: 15px; }
+        .referral-info { background-color: #fff8dc; padding: 20px; border: 2px solid #daa520; }
+        .attempts-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        .attempts-table th, .attempts-table td { border: 1px solid #000; padding: 10px; text-align: left; }
+        .attempts-table th { background-color: #f0f0f0; font-weight: bold; }
+        .recommendation { background-color: #f0f8ff; padding: 20px; border: 1px solid #4169e1; }
+        .footer { margin-top: 50px; text-align: center; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>AI DISPUTE RESOLUTION PLATFORM</h1>
+        <h2>COURT REFERRAL DOCUMENT</h2>
+        <p><strong>OFFICIAL REFERRAL FOR JUDICIAL REVIEW</strong></p>
+    </div>
+
+    <div class="section referral-info">
+        <h3>Referral Information</h3>
+        <p><strong>Case ID:</strong> {{case.id}}</p>
+        <p><strong>Case Title:</strong> {{case.title}}</p>
+        <p><strong>Case Type:</strong> {{case.case_type}}</p>
+        <p><strong>Referral Date:</strong> {{referral.date}}</p>
+        <p><strong>Reason for Referral:</strong> {{referral.reason}}</p>
+        <p><strong>Referring Authority:</strong> AI Dispute Resolution Platform</p>
+    </div>
+
+    <div class="section">
+        <h3>Settlement Attempts Summary</h3>
+        <p><strong>Total Resolution Attempts:</strong> {{attempts.count}}</p>
+        <p><strong>Platform Resolution Status:</strong> Failed</p>
+        <p><strong>Duration of Resolution Process:</strong> {{attempts.duration}} days</p>
+        
+        <table class="attempts-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Method</th>
+                    <th>Outcome</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each attempts.list}}
+                <tr>
+                    <td>{{date}}</td>
+                    <td>{{method}}</td>
+                    <td>{{outcome}}</td>
+                    <td>{{notes}}</td>
+                </tr>
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <h3>Parties Information</h3>
+        {{#each parties}}
+        <p><strong>{{role}}:</strong></p>
+        <p>&nbsp;&nbsp;&nbsp;&nbsp;Name: {{name}}</p>
+        <p>&nbsp;&nbsp;&nbsp;&nbsp;Email: {{email}}</p>
+        <p>&nbsp;&nbsp;&nbsp;&nbsp;Phone: {{phone}}</p>
+        <p>&nbsp;&nbsp;&nbsp;&nbsp;Address: {{address}}</p>
+        <br>
+        {{/each}}
+    </div>
+
+    <div class="section recommendation">
+        <h3>Platform Recommendation</h3>
+        <p style="text-align: justify;">
+            Based on the comprehensive analysis and multiple unsuccessful resolution attempts through our 
+            AI-powered dispute resolution platform, we formally recommend that this case be referred to 
+            the appropriate judicial court for legal determination.
+        </p>
+        <p style="text-align: justify;">
+            Our platform has exhausted all available alternative dispute resolution mechanisms including 
+            AI-mediated negotiations, automated settlement proposals, and structured communication facilitation. 
+            The complexity and nature of the dispute require judicial intervention for proper resolution.
+        </p>
+        <p style="text-align: justify;">
+            All relevant documentation, evidence, communication records, and analysis reports are attached 
+            herewith for the court's review and consideration.
+        </p>
+    </div>
+
+    <div class="section">
+        <h3>Attached Documents</h3>
+        <ul>
+            <li>Complete Case File and Documentation</li>
+            <li>AI Analysis and Recommendations Report</li>
+            <li>Communication History Between Parties</li>
+            <li>Evidence and Supporting Documents</li>
+            <li>Settlement Attempt Records</li>
+            <li>Platform Activity Timeline</li>
+        </ul>
+    </div>
+
+    <div class="footer">
+        <p><strong>AI Dispute Resolution Platform</strong></p>
+        <p>Authorized Legal Technology Service Provider</p>
+        <p>Generated on: {{generated.date}} | Document ID: {{document.id}}</p>
+        <p>This document is digitally signed and authenticated</p>
+    </div>
+</body>
+</html>

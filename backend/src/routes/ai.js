@@ -77,8 +77,8 @@ const legalResearchValidation = [
  * @swagger
  * /api/ai/analyze-case/{caseId}:
  *   post:
- *     summary: Analyze a case using AI
- *     description: Generate comprehensive AI analysis of a legal case including summary, legal issues, strength assessment, and recommendations
+ *     summary: Analyze a case using AI with workflow integration
+ *     description: Generate comprehensive AI analysis of a legal case and update workflow state
  *     tags: [AI Analysis]
  *     parameters:
  *       - in: path
@@ -90,7 +90,7 @@ const legalResearchValidation = [
  *         description: Unique case identifier
  *     responses:
  *       200:
- *         description: Analysis completed successfully
+ *         description: Analysis completed successfully and workflow updated
  *       400:
  *         description: Invalid case ID
  *       403:
@@ -105,11 +105,11 @@ router.post('/analyze-case/:caseId',
 
 /**
  * @swagger
- * /api/ai/settlement-proposals/{caseId}:
+ * /api/ai/settlement-options/{caseId}:
  *   post:
- *     summary: Generate AI settlement proposals
- *     description: Create multiple settlement proposal options using AI analysis
- *     tags: [AI Analysis]
+ *     summary: Generate AI settlement options with workflow integration
+ *     description: Create multiple settlement options using AI analysis and update workflow state
+ *     tags: [AI Settlement]
  *     parameters:
  *       - in: path
  *         name: caseId
@@ -137,13 +137,95 @@ router.post('/analyze-case/:caseId',
  *                     enum: [conservative, balanced, aggressive]
  *     responses:
  *       200:
- *         description: Settlement proposals generated successfully
+ *         description: Settlement options generated successfully
  */
-router.post('/settlement-proposals/:caseId', 
+router.post('/settlement-options/:caseId', 
   caseIdValidation,
   settlementPreferencesValidation,
   validate,
-  AIController.generateSettlementProposals);
+  AIController.generateSettlementOptions);
+
+/**
+ * @swagger
+ * /api/ai/select-option/{caseId}/{optionId}:
+ *   post:
+ *     summary: Select a settlement option
+ *     description: Select a specific settlement option and update workflow state
+ *     tags: [AI Settlement]
+ *     parameters:
+ *       - in: path
+ *         name: caseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *       - in: path
+ *         name: optionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reasoning:
+ *                 type: string
+ *                 description: Optional reasoning for selection
+ *     responses:
+ *       200:
+ *         description: Option selected successfully
+ */
+router.post('/select-option/:caseId/:optionId', [
+  param('caseId').isUUID('4').withMessage('Valid case ID is required'),
+  param('optionId').notEmpty().withMessage('Option ID is required'),
+  body('reasoning').optional().isString().withMessage('Reasoning must be a string')
+], validate, AIController.selectOption);
+
+/**
+ * @swagger
+ * /api/ai/accept-combined-solution/{caseId}:
+ *   post:
+ *     summary: Accept the AI-generated combined solution
+ *     description: Accept the combined solution and finalize the consensus
+ *     tags: [AI Settlement]
+ *     parameters:
+ *       - in: path
+ *         name: caseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Combined solution accepted successfully
+ */
+router.post('/accept-combined-solution/:caseId', [
+  param('caseId').isUUID('4').withMessage('Valid case ID is required')
+], validate, AIController.acceptCombinedSolution);
+
+/**
+ * @swagger
+ * /api/ai/case-status/{caseId}:
+ *   get:
+ *     summary: Get AI workflow status for a case
+ *     description: Get the current AI processing status and workflow state
+ *     tags: [AI Status]
+ *     parameters:
+ *       - in: path
+ *         name: caseId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Status retrieved successfully
+ */
+router.get('/case-status/:caseId', [
+  param('caseId').isUUID('4').withMessage('Valid case ID is required')
+], validate, AIController.getCaseAIStatus);
 
 /**
  * @swagger

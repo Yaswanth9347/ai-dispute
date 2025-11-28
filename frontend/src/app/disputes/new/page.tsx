@@ -27,7 +27,6 @@ export default function NewDisputePage() {
     title: '',
     description: '',
     case_type: 'civil',
-    jurisdiction: 'India',
     dispute_amount: '',
     priority: 'medium',
     // Respondent details
@@ -88,7 +87,6 @@ export default function NewDisputePage() {
           description: formData.description,
           filed_by: user.id,
           case_type: formData.case_type,
-          jurisdiction: formData.jurisdiction,
           dispute_amount: formData.dispute_amount ? parseFloat(formData.dispute_amount) : null,
           priority: formData.priority,
         }),
@@ -281,21 +279,6 @@ export default function NewDisputePage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Jurisdiction */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Jurisdiction
-                  </label>
-                  <input
-                    type="text"
-                    name="jurisdiction"
-                    value={formData.jurisdiction}
-                    onChange={handleInputChange}
-                    placeholder="e.g., India, Maharashtra"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
                 {/* Dispute Amount */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">

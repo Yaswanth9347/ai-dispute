@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { supabase } = require('../lib/supabaseClient');
+const { requireAuth } = require('../lib/authMiddleware');
 const multer = require('multer');
 const upload = multer({ dest: '/tmp/uploads' });
 const fs = require('fs');
@@ -207,6 +208,32 @@ router.post('/:id/invite', async (req, res) => {
     return res.status(500).json({ error: err.message || err });
   }
 });
+
+// ===== ENHANCED FEATURES ENDPOINTS =====
+
+// Import CaseController for new endpoints
+const CaseController = require('../controllers/CaseController');
+
+// POST /:id/onboard-defender - Auto-create defender account when case is filed
+router.post('/:id/onboard-defender', requireAuth, CaseController.onboardDefender);
+
+// POST /:id/resend-credentials - Resend defender login credentials
+router.post('/:id/resend-credentials', requireAuth, CaseController.resendDefenderCredentials);
+
+// GET /:id/argument-status - Get argument completion status for both parties
+router.get('/:id/argument-status', requireAuth, CaseController.getArgumentStatus);
+
+// POST /:id/confirm-arguments - Confirm arguments completion by party
+router.post('/:id/confirm-arguments', requireAuth, CaseController.confirmArguments);
+
+// POST /:id/trigger-sheriff-analysis - Trigger AI Sheriff analysis after both parties confirm
+router.post('/:id/trigger-sheriff-analysis', requireAuth, CaseController.triggerSheriffAnalysis);
+
+// POST /:id/create-court-package - Create comprehensive court referral package (ZIP)
+router.post('/:id/create-court-package', requireAuth, CaseController.createCourtPackage);
+
+// GET /:id/court-package - Get court package information
+router.get('/:id/court-package', requireAuth, CaseController.getCourtPackage);
 
 module.exports = router;
 
